@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[ HARES-TELEMETRY-SIMULATOR ]</title>
+    <!-- Google Fonts: Monospace dominance & Heavy Sans-Serif -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Archivo+Black&display=swap" rel="stylesheet">
+    <style>
+        /* INDUSTRIAL BRUTALISM: TACTICAL TELEMETRY & CRT TERMINAL EXCLUSIVITY */
+        :root {
+            --bg-color: #0A0A0A;
+            --panel-bg: #111111;
+            --fg-color: #EAEAEA;
+            --accent-red: #FF2A2A;
+            --accent-green: #39FF14;
+            --accent-blue: #00E5FF;
+            --accent-amber: #FFB300;
+            --border-width: 1px;
+            --font-mono: 'IBM Plex Mono', monospace;
+            --font-heavy: 'Archivo Black', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            /* Absolute rejection of border-radius for mechanical rigidity */
+            border-radius: 0 !important;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.4;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Programmatic simulation of CRT Scanlines and Phosphor Glow */
+        body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 9999;
+            background-size: 100% 4px, 4px 100%;
+            pointer-events: none;
+        }
+
+        /* Header Style: Monolithic Macro-Typography */
+        header {
+            width: 100%;
+            background-color: #000;
+            border-bottom: 2px solid var(--accent-red);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-title h1 {
+            font-family: var(--font-heavy);
+            font-size: 20px;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            color: var(--fg-color);
+            text-shadow: 0 0 5px rgba(234, 234, 234, 0.3);
+        }
+
+        .header-title span {
+            font-size: 9px;
+            color: var(--accent-amber);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .system-status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .pulse-led {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
+
+        /* CSS Grid Determinism: Mathematical Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr 340px;
+            flex: 1;
+            height: calc(100vh - 54px);
+            background-color: #1a1a1a;
+            gap: var(--border-width);
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            background-color: #000;
+            border-bottom: 1px solid #333;
+            padding: 6px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .panel-header .title {
+            color: var(--accent-amber);
+        }
+
+        .panel-header .sub {
+            color: #666;
+        }
+
+        /* Left Panel Styles: Telemetry & Interactive Controls */
+        .panel-content {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .telemetry-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px dashed #222;
+            padding: 6px 0;
+        }
+
+        .telemetry-label {
+            color: #888;
+            font-size: 10px;
+        }
+
+        .telemetry-value {
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .telemetry-value.green {
+            color: var(--accent-green);
+            text-shadow: 0 0 3px rgba(57, 255, 20, 0.4);
+        }
+
+        .telemetry-value.blue {
+            color: var(--accent-blue);
+            text-shadow: 0 0 3px rgba(0, 229, 255, 0.4);
+        }
+
+        .telemetry-value.amber {
+            color: var(--accent-amber);
+            text-shadow: 0 0 3px rgba(255, 179, 0, 0.4);
+        }
+
+        .telemetry-value.red {
+            color: var(--accent-red);
+            text-shadow: 0 0 3px rgba(255, 42, 42, 0.4);
+        }
+
+        /* Meter bar gauge */
+        .gauge-container {
+            width: 100%;
+            height: 14px;
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            margin-top: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-bar {
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        .gauge-bar.green { background-color: var(--accent-green); }
+        .gauge-bar.blue { background-color: var(--accent-blue); }
+        .gauge-bar.amber { background-color: var(--accent-amber); }
+        .gauge-bar.red { background-color: var(--accent-red); }
+
+        .gauge-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 9px;
+            font-weight: 700;
+            color: #fff;
+            mix-blend-mode: difference;
+        }
+
+        /* Hazard Warning Striped Borders */
+        .hazard-banner {
+            background: repeating-linear-gradient(
+                -45deg,
+                #222,
+                #222 10px,
+                #111 10px,
+                #111 20px
+            );
+            border: 1px solid #333;
+            padding: 8px;
+            font-size: 10px;
+            color: var(--accent-amber);
+            text-align: center;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        /* Interactive controls buttons */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .btn-utilitarian {
+            background-color: #000;
+            border: 1px solid #444;
+            color: var(--fg-color);
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            cursor: pointer;
+            text-align: left;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .btn-utilitarian::after {
+            content: ">>>";
+            position: absolute;
+            right: 12px;
+            color: #555;
+            transition: color 0.2s ease;
+        }
+
+        .btn-utilitarian:hover {
+            background-color: #1f1f1f;
+            border-color: var(--accent-amber);
+            color: var(--accent-amber);
+        }
+
+        .btn-utilitarian:hover::after {
+            color: var(--accent-amber);
+        }
+
+        .btn-utilitarian.active {
+            background-color: var(--accent-red);
+            border-color: var(--accent-red);
+            color: #000;
+        }
+
+        .btn-utilitarian.active::after {
+            color: #000;
+            content: "[ACT]";
+        }
+
+        /* 2D Tactical Simulation Canvas (Center Panel) */
+        .simulation-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #000;
+            position: relative;
+        }
+
+        canvas {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            display: block;
+            background-color: #080808;
+            image-rendering: pixelated;
+        }
+
+        /* Behavior Tree Node State Indicators */
+        .behavior-tree-panel {
+            padding: 10px;
+            background-color: #0a0a0a;
+            border-top: 1px solid #222;
+            font-size: 9px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+
+        .bt-node {
+            border: 1px solid #222;
+            padding: 4px;
+            text-align: center;
+            color: #555;
+            background-color: #111;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .bt-node.running {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background-color: rgba(0, 229, 255, 0.05);
+            box-shadow: 0 0 5px rgba(0, 229, 255, 0.2);
+        }
+
+        .bt-node.success {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            background-color: rgba(57, 255, 20, 0.05);
+        }
+
+        .bt-node.failure {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+            background-color: rgba(255, 42, 42, 0.05);
+        }
+
+        /* Right Panel: Active Console Logger (ROSBAG-like output) */
+        .console-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            background-color: #000;
+            border-left: 1px solid #222;
+            padding: 8px;
+            overflow: hidden;
+        }
+
+        .console-log {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 4px;
+        }
+
+        .console-line {
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid #111;
+            padding-bottom: 4px;
+        }
+
+        .console-meta {
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            margin-bottom: 2px;
+            font-size: 8px;
+        }
+
+        .console-msg {
+            color: var(--fg-color);
+            word-break: break-all;
+        }
+
+        .console-msg.info { color: #fff; }
+        .console-msg.warn { color: var(--accent-amber); }
+        .console-msg.error { color: var(--accent-red); font-weight: 700; }
+        .console-msg.success { color: var(--accent-green); }
+
+        /* Scrollbar styles for pure industrial terminal design */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-amber);
+        }
+
+        /* Legend overlaid on simulation canvas */
+        .map-legend {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background-color: rgba(0, 0, 0, 0.85);
+            border: 1px solid #333;
+            padding: 8px;
+            font-size: 9px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #666;
+        }
+
+        /* Keyboard layout helper */
+        .controls-overlay {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background-color: rgba(0, 0, 0, 0.85);
+            border: 1px solid #333;
+            padding: 8px 12px;
+            font-size: 9px;
+            pointer-events: none;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        kbd {
+            background-color: #222;
+            border: 1px solid #555;
+            padding: 1px 4px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: var(--accent-amber);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MONOLITHIC TACTICAL HEADER -->
+    <header>
+        <div class="header-title">
+            <h1>HARES SYSTEM v1.0.4-TACTICAL</h1>
+            <span>Heterogeneous Adaptive Robotic Expedition System // Autonomous Coordination Unit</span>
+        </div>
+        <div class="system-status-indicator">
+            <span>[ LINK-ESTABLISHED ]</span>
+            <span>BAT-ROVER: 100%</span>
+            <div class="pulse-led"></div>
+        </div>
+    </header>
+
+    <!-- MAIN DATA GRID -->
+    <div class="main-grid">
+        
+        <!-- LEFT PANEL: SYSTEM TELEMETRY -->
+        <div class="panel">
+            <div class="panel-header">
+                <span class="title">/// TELEMETRIA DE SISTEMAS</span>
+                <span class="sub">HARES-R01</span>
+            </div>
+            <div class="panel-content">
+                
+                <div class="hazard-banner">
+                    [ ESTADO DE LA MISIÓN: SEGUIMIENTO ]
+                </div>
+
+                <!-- STATE TELEMETRY -->
+                <div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">ESTADO DE CONTROL:</span>
+                        <span id="tel-state" class="telemetry-value green">DOCK_CHARGING</span>
+                    </div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">DOCKING DE SEGURIDAD:</span>
+                        <span id="tel-docked" class="telemetry-value green">BLOQUEADO</span>
+                    </div>
+                </div>
+
+                <!-- TRANSITABILITY TELEMETRY -->
+                <div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">TRANSITABILIDAD DEL TERRENO:</span>
+                        <span id="tel-transitability" class="telemetry-value green">1.00</span>
+                    </div>
+                    <div class="gauge-container">
+                        <div id="tel-transitability-bar" class="gauge-bar green" style="width: 100%;"></div>
+                        <div id="tel-transitability-txt" class="gauge-text">T(x,y) = 1.00</div>
+                    </div>
+                </div>
+
+                <!-- BATTERY GAUGES -->
+                <div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">BATERIA UGV (ROVER MADRE):</span>
+                        <span id="tel-bat-ugv" class="telemetry-value blue">100.0%</span>
+                    </div>
+                    <div class="gauge-container">
+                        <div id="tel-bat-ugv-bar" class="gauge-bar blue" style="width: 100%;"></div>
+                        <div class="gauge-text">UGV: 24.2V</div>
+                    </div>
+
+                    <div class="telemetry-row" style="margin-top: 8px;">
+                        <span class="telemetry-label">BATERIA UAV (DRON DE APOYO):</span>
+                        <span id="tel-bat-uav" class="telemetry-value green">100.0%</span>
+                    </div>
+                    <div class="gauge-container">
+                        <div id="tel-bat-uav-bar" class="gauge-bar green" style="width: 100%;"></div>
+                        <div class="gauge-text">UAV: 14.8V</div>
+                    </div>
+                </div>
+
+                <!-- RANGE & DISTANCE TELEMETRY -->
+                <div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">DISTANCIA AL HUMANO:</span>
+                        <span id="tel-dist" class="telemetry-value">0.0 m</span>
+                    </div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">POSICION UGV:</span>
+                        <span id="tel-pos-ugv" class="telemetry-value">X: 0.0, Y: 0.0</span>
+                    </div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">POSICION UAV:</span>
+                        <span id="tel-pos-uav" class="telemetry-value">DOCKED</span>
+                    </div>
+                </div>
+
+                <!-- UTILITARIAN CONTROLS -->
+                <div class="control-group">
+                    <span class="telemetry-label">/// CONTROLES DE ANULACION MANUAL</span>
+                    <button id="btn-deploy" class="btn-utilitarian">Lanzar Dron (Forzar)</button>
+                    <button id="btn-recall" class="btn-utilitarian">Llamar Dron (Rendezvous)</button>
+                    <button id="btn-env" class="btn-utilitarian">Cambiar Entorno (Obstáculo)</button>
+                    <button id="btn-reset" class="btn-utilitarian">Reiniciar Simulación</button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- CENTER PANEL: 2D SIMULATION MAP -->
+        <div class="panel">
+            <div class="panel-header">
+                <span class="title">/// MONITOREO DE ESPACIO TÁCTICO DE CAMPO</span>
+                <span class="sub">VISTA SUPERIOR 2D</span>
+            </div>
+            
+            <div class="simulation-container">
+                <!-- LEGENDA SOBREPUESTA -->
+                <div class="map-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #39FF14;"></div>
+                        <span>Persona Objetivo (Tú)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #00E5FF;"></div>
+                        <span>Rover Madre (UGV)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #FF2A2A;"></div>
+                        <span>Obstáculo Sólido (Infranqueable UGV)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: rgba(255, 179, 0, 0.2); border: 1px dashed var(--accent-amber);"></div>
+                        <span>Terreno Escabroso (Transitabilidad Baja)</span>
+                    </div>
+                </div>
+
+                <!-- INSTRUCCIONES DE TECLADO SOBREPUESTAS -->
+                <div class="controls-overlay">
+                    <div>CONTROLES HUMANO:</div>
+                    <div>Mover: <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> o <kbd>↑</kbd> <kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd></div>
+                    <div style="color: var(--accent-amber); margin-top: 4px;">Pasa por la arena o cruza el cañón para obligar al Rover a decidir.</div>
+                </div>
+
+                <!-- EL LIENZO DEL SIMULADOR -->
+                <canvas id="simCanvas"></canvas>
+            </div>
+
+            <!-- BEHAVIOR TREE LIVE UPDATES -->
+            <div class="behavior-tree-panel">
+                <div id="bt-ground" class="bt-node success">Follow Ground</div>
+                <div id="bt-deploy" class="bt-node">Deploy UAV</div>
+                <div id="bt-aerial" class="bt-node">Aerial Follow</div>
+                <div id="bt-landing" class="bt-node">Land & Dock</div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: ACTIVE CONSOLE WRITER -->
+        <div class="panel">
+            <div class="panel-header">
+                <span class="title">/// ROS2 / ROSBAG INTERCEPTOR CONSOLE</span>
+                <span class="sub">SYS_BUS_LOG</span>
+            </div>
+            <div class="console-container">
+                <div id="consoleLog" class="console-log">
+                    <!-- Logs dynamically generated -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT SIMULATION LOGIC -->
+    <script>
+        // Setup Canvas and context
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Handle canvas sizing
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Environment Obstacles & Zones Configuration
+        let terrainType = 1; // 1 = Canyon Block, 2 = Boulder Maze
+        let obstacles = [];
+        let roughTerrains = [];
+
+        function buildEnvironment() {
+            obstacles = [];
+            roughTerrains = [];
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            if (terrainType === 1) {
+                // ENVIRONMENT 1: A massive horizontal canyon wall in the middle, leaving a single transitable pass on the far right
+                // Solid block (canyon wall)
+                obstacles.push({
+                    x: 0,
+                    y: h * 0.45,
+                    width: w * 0.75,
+                    height: 35,
+                    label: "CANYON_WALL"
+                });
+
+                // Low transitability rough sand zone leading to the canyon wall, which UGV cannot pass but human can easily climb
+                roughTerrains.push({
+                    x: 0,
+                    y: h * 0.35,
+                    width: w * 0.75,
+                    height: h * 0.25,
+                    label: "SAND_DUNES"
+                });
+            } else {
+                // ENVIRONMENT 2: Boulder maze. Multiple vertical pillars in the center, and a wide area of low transitability swamp
+                obstacles.push({ x: w * 0.2, y: h * 0.1, width: 40, height: h * 0.3, label: "ROCK_A" });
+                obstacles.push({ x: w * 0.5, y: h * 0.5, width: 40, height: h * 0.4, label: "ROCK_B" });
+                obstacles.push({ x: w * 0.35, y: h * 0.4, width: 60, height: 40, label: "RUIN_C" });
+
+                roughTerrains.push({
+                    x: w * 0.15,
+                    y: h * 0.25,
+                    width: w * 0.5,
+                    height: h * 0.45,
+                    label: "SWAMP"
+                });
+            }
+        }
+
+        // Key listeners for target human
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            // Prevent scrolling on arrows/space
+            if(["arrowup","arrowdown","arrowleft","arrowright"," "].indexOf(e.key.toLowerCase()) > -1) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Human Entity (Target)
+        const human = {
+            x: 150,
+            y: 100,
+            radius: 8,
+            speed: 3,
+            color: '#39FF14',
+            trail: []
+        };
+
+        // Mother Rover (UGV Entity)
+        const ugv = {
+            x: 100,
+            y: 500,
+            width: 28,
+            height: 18,
+            speed: 2.0,
+            angle: -Math.PI / 2,
+            targetDist: 85,
+            color: '#00E5FF',
+            battery: 100.0,
+            state: 'FOLLOW_GROUND', // FOLLOW_GROUND, DEPLOY_UAV, GROUND_REPLAN, RENDEZVOUS, LAND_DOCK, DOCKED_CHARGING
+            isDocked: true,
+            trail: [],
+            // Custom dynamic navigation target point
+            navWaypoint: null,
+            replanTime: 0
+        };
+
+        // Support Drone (UAV Entity)
+        const uav = {
+            x: 100,
+            y: 500,
+            radius: 6,
+            altitude: 0, // Visual height scaling
+            maxAltitude: 25,
+            speed: 4.5,
+            hoverSine: 0,
+            color: '#FFB300',
+            battery: 100.0,
+            chargeRate: 0.15,
+            dischargeRate: 0.05,
+            scanAngle: 0,
+            trail: []
+        };
+
+        // Logger Queue
+        const consoleLogElement = document.getElementById('consoleLog');
+        function addLog(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const logLine = document.createElement('div');
+            logLine.className = 'console-line';
+            
+            let bracketLabel = '[INFO]';
+            if (type === 'warn') bracketLabel = '[WARN]';
+            if (type === 'error') bracketLabel = '[CRIT_ERR]';
+            if (type === 'success') bracketLabel = '[SUCCESS]';
+
+            logLine.innerHTML = `
+                <div class="console-meta">
+                    <span>${bracketLabel} // TOPIC: /hares/system_bus</span>
+                    <span>${time}</span>
+                </div>
+                <div class="console-msg ${type}">${msg}</div>
+            `;
+            consoleLogElement.appendChild(logLine);
+            consoleLogElement.scrollTop = consoleLogElement.scrollHeight;
+
+            // Keep clean length
+            while (consoleLogElement.children.length > 50) {
+                consoleLogElement.removeChild(consoleLogElement.firstChild);
+            }
+        }
+
+        // Initialize logging
+        addLog("SISTEMA HARES ARRANCADO CORRECTAMENTE.", 'success');
+        addLog("CARGANDO ENTORNO TACTICO 2D...", 'info');
+        addLog("CONEXION DDS ESTABLECIDA CON DISPOSITIVOS.", 'success');
+        addLog("MODO POR DEFECTO: SEGUIMIENTO TERRESTRE EN CURSO.", 'info');
+
+        // Helper: Euclidean Distance
+        function dist(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1)**2 + (y2 - y1)**2);
+        }
+
+        // Helper: Check if point is inside a solid obstacle
+        function isPointInObstacles(x, y, padding = 0) {
+            for (let obs of obstacles) {
+                if (x >= obs.x - padding && x <= obs.x + obs.width + padding &&
+                    y >= obs.y - padding && y <= obs.y + obs.height + padding) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Helper: Calculate terrain transitability index T(x,y)
+        // Returns [0.0 - 1.0], where lower values mean worse terrain
+        function getTransitability(x, y) {
+            // First, if it's inside a solid obstacle, transitability is 0
+            if (isPointInObstacles(x, y, 10)) {
+                return 0.0;
+            }
+            // Check if inside any rough terrain zones
+            for (let rt of roughTerrains) {
+                if (x >= rt.x && x <= rt.x + rt.width &&
+                    y >= rt.y && y <= rt.y + rt.height) {
+                    return 0.22; // Low transitability
+                }
+            }
+            return 1.00; // Fully transitable
+        }
+
+        // Setup environment
+        buildEnvironment();
+
+        // Navigation waypoint calculation around obstacles (simple pathfinding for simulation)
+        function findReplanTarget(start_x, start_y, end_x, end_y) {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            if (terrainType === 1) {
+                // Canyon bypass: Waypoint is on the far right where the canyon ends
+                const bypass_x = w * 0.85;
+                const bypass_y = h * 0.47;
+                
+                // If UGV is below the canyon, it must first navigate to bypass
+                if (start_y > h * 0.45 && end_y < h * 0.45) {
+                    return { x: bypass_x, y: bypass_y + 40 };
+                } else if (start_y < h * 0.45 && end_y > h * 0.45) {
+                    return { x: bypass_x, y: bypass_y - 40 };
+                }
+            } else {
+                // Maze bypass: steer to middle gaps
+                if (start_x < w * 0.5 && end_x > w * 0.5) {
+                    return { x: w * 0.45, y: h * 0.2 };
+                }
+            }
+            return { x: end_x, y: end_y };
+        }
+
+        // Render functions
+        function drawGrid() {
+            ctx.strokeStyle = '#141414';
+            ctx.lineWidth = 1;
+            const size = 30;
+            for (let x = 0; x < canvas.width; x += size) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += size) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawObstacles() {
+            // Draw rough terrain hatched warning zones
+            roughTerrains.forEach(rt => {
+                ctx.fillStyle = 'rgba(255, 179, 0, 0.08)';
+                ctx.fillRect(rt.x, rt.y, rt.width, rt.height);
+                
+                ctx.strokeStyle = 'rgba(255, 179, 0, 0.2)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([5, 10]);
+                ctx.strokeRect(rt.x, rt.y, rt.width, rt.height);
+                ctx.setLineDash([]);
+
+                // Hatching lines
+                ctx.strokeStyle = 'rgba(255, 179, 0, 0.15)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let offset = -rt.height; offset < rt.width; offset += 15) {
+                    ctx.moveTo(Math.max(rt.x, rt.x + offset), rt.y);
+                    ctx.lineTo(Math.min(rt.x + rt.width, rt.x + offset + rt.height), rt.y + rt.height);
+                }
+                ctx.stroke();
+
+                // Text
+                ctx.fillStyle = 'rgba(255, 179, 0, 0.4)';
+                ctx.font = '8px ' + varMono();
+                ctx.fillText(`[ AMB_ZONE: ${rt.label} // T_LOW ]`, rt.x + 8, rt.y + 14);
+            });
+
+            // Draw solid obstacles
+            obstacles.forEach(obs => {
+                // Hazard border fill
+                ctx.fillStyle = '#1c0505';
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+                ctx.strokeStyle = varRed();
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+
+                // Warning stripes across obstacle
+                ctx.fillStyle = 'rgba(255, 42, 42, 0.15)';
+                ctx.beginPath();
+                const step = 12;
+                for (let i = 0; i < obs.width + obs.height; i += step) {
+                    ctx.moveTo(obs.x + i, obs.y);
+                    ctx.lineTo(obs.x + i - obs.height, obs.y + obs.height);
+                    ctx.lineTo(obs.x + i - obs.height + 4, obs.y + obs.height);
+                    ctx.lineTo(obs.x + i + 4, obs.y);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // Label
+                ctx.fillStyle = varRed();
+                ctx.font = 'bold 8px ' + varMono();
+                ctx.fillText(`+ ${obs.label} (IMP_BARRIER) +`, obs.x + 6, obs.y + obs.height/2 + 3);
+            });
+        }
+
+        // Core variables fetchers for design consistency
+        function varRed() { return getComputedStyle(document.documentElement).getPropertyValue('--accent-red').trim(); }
+        function varGreen() { return getComputedStyle(document.documentElement).getPropertyValue('--accent-green').trim(); }
+        function varBlue() { return getComputedStyle(document.documentElement).getPropertyValue('--accent-blue').trim(); }
+        function varAmber() { return getComputedStyle(document.documentElement).getPropertyValue('--accent-amber').trim(); }
+        function varMono() { return getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim(); }
+
+        function drawHuman() {
+            // Draw trail
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(57, 255, 20, 0.15)';
+            ctx.lineWidth = 1.5;
+            human.trail.forEach((p, idx) => {
+                if (idx === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+
+            // Draw Pulsing Beacon Ring
+            const beaconRadius = human.radius + 6 + Math.sin(Date.now() / 150) * 3;
+            ctx.strokeStyle = 'rgba(57, 255, 20, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(human.x, human.y, beaconRadius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Solid inner
+            ctx.fillStyle = human.color;
+            ctx.beginPath();
+            ctx.arc(human.x, human.y, human.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tactical ID
+            ctx.fillStyle = '#fff';
+            ctx.font = '8px ' + varMono();
+            ctx.fillText("HUMAN_TARGET", human.x + 12, human.y - 4);
+        }
+
+        function drawUGV() {
+            // Draw trail
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.1)';
+            ctx.lineWidth = 1;
+            ugv.trail.forEach((p, idx) => {
+                if (idx === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+
+            // Save context for rotated rover drawing
+            ctx.save();
+            ctx.translate(ugv.x, ugv.y);
+            ctx.rotate(ugv.angle);
+
+            // Wheels (4 rigid blocks)
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-ugv.width/2 - 2, -ugv.height/2 - 3, 10, 4);
+            ctx.fillRect(ugv.width/2 - 8, -ugv.height/2 - 3, 10, 4);
+            ctx.fillRect(-ugv.width/2 - 2, ugv.height/2 - 1, 10, 4);
+            ctx.fillRect(ugv.width/2 - 8, ugv.height/2 - 1, 10, 4);
+
+            // Main Chassis
+            ctx.fillStyle = '#111';
+            ctx.strokeStyle = ugv.color;
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(-ugv.width/2, -ugv.height/2, ugv.width, ugv.height);
+            ctx.strokeRect(-ugv.width/2, -ugv.height/2, ugv.width, ugv.height);
+
+            // Landing Pad Cross/Circle on top of Rover
+            ctx.strokeStyle = ugv.color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-7, 0); ctx.lineTo(7, 0);
+            ctx.moveTo(0, -7); ctx.lineTo(0, 7);
+            ctx.stroke();
+
+            // Directional head bar
+            ctx.fillStyle = varAmber();
+            ctx.fillRect(ugv.width/2 - 3, -2, 3, 4);
+
+            ctx.restore();
+
+            // UGV Info
+            ctx.fillStyle = ugv.color;
+            ctx.font = 'bold 8px ' + varMono();
+            ctx.fillText(`UGV_ROVER [${ugv.state}]`, ugv.x + 18, ugv.y + 12);
+        }
+
+        function drawUAV() {
+            if (ugv.isDocked) return; // Hidden while docked
+
+            // Drone shadow scaling with altitude
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.arc(uav.x, uav.y + uav.altitude/2, 4 + uav.altitude/5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw UAV trail
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 179, 0, 0.15)';
+            ctx.lineWidth = 1;
+            uav.trail.forEach((p, idx) => {
+                if (idx === 0) ctx.moveTo(p.x, p.y - p.alt);
+                else ctx.lineTo(p.x, p.y - p.alt);
+            });
+            ctx.stroke();
+
+            // Draw Flight elevation guide line
+            ctx.strokeStyle = '#222';
+            ctx.setLineDash([2, 4]);
+            ctx.beginPath();
+            ctx.moveTo(uav.x, uav.y);
+            ctx.lineTo(uav.x, uav.y - uav.altitude);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Render UAV above its shadow according to flight altitude
+            const dY = uav.y - uav.altitude;
+
+            // Draw vision cone scanning down to human if active tracking
+            if (ugv.state === 'AERIAL_FOLLOW') {
+                uav.scanAngle += 0.05;
+                ctx.fillStyle = 'rgba(255, 179, 0, 0.04)';
+                ctx.beginPath();
+                ctx.moveTo(uav.x, dY);
+                ctx.lineTo(human.x - 15, human.y);
+                ctx.lineTo(human.x + 15, human.y);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(255, 179, 0, 0.15)';
+                ctx.beginPath();
+                ctx.moveTo(uav.x, dY);
+                ctx.lineTo(human.x, human.y);
+                ctx.stroke();
+
+                // Target lock circles on human
+                ctx.strokeStyle = varAmber();
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(human.x, human.y, 14 + Math.sin(uav.scanAngle)*3, 0, Math.PI*2);
+                ctx.stroke();
+            }
+
+            // Save context for Drone structure (drawing at actual fly height)
+            ctx.save();
+            ctx.translate(uav.x, dY);
+
+            // Central fuselage
+            ctx.fillStyle = '#050505';
+            ctx.strokeStyle = varAmber();
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // X Quadcopter Arms
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-8, -8); ctx.lineTo(8, 8);
+            ctx.moveTo(-8, 8); ctx.lineTo(8, -8);
+            ctx.stroke();
+
+            // 4 rotors spinning (rotates with time)
+            ctx.strokeStyle = 'rgba(234, 234, 234, 0.4)';
+            ctx.lineWidth = 1;
+            const rotSpeed = Date.now() / 20;
+            [-8, 8].forEach(rx => {
+                [-8, 8].forEach(ry => {
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, 5, rotSpeed, rotSpeed + Math.PI);
+                    ctx.stroke();
+                    // Small center cap
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, 1.5, 0, Math.PI*2);
+                    ctx.fill();
+                });
+            });
+
+            ctx.restore();
+
+            // UAV Label
+            ctx.fillStyle = varAmber();
+            ctx.font = 'bold 8px ' + varMono();
+            ctx.fillText(`UAV_DRONE (ALT: ${Math.round(uav.altitude)}m)`, uav.x + 12, dY - 8);
+        }
+
+        // Simulation State Engine (The Behavior Tree Emulator)
+        function updateSimulation() {
+            const h = canvas.height;
+            const w = canvas.width;
+
+            // 1. Move Human (Target) via Keyboard Input
+            let dx = 0;
+            let dy = 0;
+            if (keys['w'] || keys['arrowup']) dy = -1;
+            if (keys['s'] || keys['arrowdown']) dy = 1;
+            if (keys['a'] || keys['arrowleft']) dx = -1;
+            if (keys['d'] || keys['arrowright']) dx = 1;
+
+            // Normalize diagonal speed
+            if (dx !== 0 && dy !== 0) {
+                const len = Math.sqrt(dx*dx + dy*dy);
+                dx /= len;
+                dy /= len;
+            }
+
+            // Move and collide human with solid obstacles (humans cannot walk through solid rock/walls)
+            const target_x = human.x + dx * human.speed;
+            const target_y = human.y + dy * human.speed;
+            
+            if (!isPointInObstacles(target_x, human.y, human.radius)) {
+                human.x = target_x;
+            }
+            if (!isPointInObstacles(human.x, target_y, human.radius)) {
+                human.y = target_y;
+            }
+
+            // Limit boundary
+            human.x = Math.max(human.radius, Math.min(canvas.width - human.radius, human.x));
+            human.y = Math.max(human.radius, Math.min(canvas.height - human.radius, human.y));
+
+            // Record trail
+            if (Math.random() < 0.15) {
+                human.trail.push({x: human.x, y: human.y});
+                if (human.trail.length > 30) human.trail.shift();
+            }
+
+            // 2. Compute live values of environment
+            const currentTransitability = getTransitability(ugv.x, ugv.y);
+            
+            // Update telemetry UI values
+            document.getElementById('tel-transitability').innerText = currentTransitability.toFixed(2);
+            document.getElementById('tel-transitability-txt').innerText = `T(x,y) = ${currentTransitability.toFixed(2)}`;
+            const bar = document.getElementById('tel-transitability-bar');
+            bar.style.width = `${currentTransitability * 100}%`;
+            
+            // Coloring index based on risk
+            if (currentTransitability > 0.8) {
+                bar.className = "gauge-bar green";
+                document.getElementById('tel-transitability').className = "telemetry-value green";
+            } else if (currentTransitability > 0.4) {
+                bar.className = "gauge-bar amber";
+                document.getElementById('tel-transitability').className = "telemetry-value amber";
+            } else {
+                bar.className = "gauge-bar red";
+                document.getElementById('tel-transitability').className = "telemetry-value red";
+            }
+
+            const distanceToTarget = dist(ugv.x, ugv.y, human.x, human.y);
+            document.getElementById('tel-dist').innerText = `${(distanceToTarget/20).toFixed(1)} m`;
+            document.getElementById('tel-pos-ugv').innerText = `X: ${(ugv.x/20).toFixed(1)}, Y: ${((h-ugv.y)/20).toFixed(1)}`;
+
+            // Behavior Tree states UI sync
+            const btNodes = {
+                'ground': document.getElementById('bt-ground'),
+                'deploy': document.getElementById('bt-deploy'),
+                'aerial': document.getElementById('bt-aerial'),
+                'landing': document.getElementById('bt-landing')
+            };
+            // Clear nodes
+            Object.values(btNodes).forEach(el => el.className = 'bt-node');
+
+            // 3. HARES Autonomous Decision State Machine
+            switch (ugv.state) {
+                
+                case 'FOLLOW_GROUND':
+                    btNodes['ground'].className = 'bt-node running';
+                    document.getElementById('tel-state').innerText = "FOLLOW_GROUND";
+                    document.getElementById('tel-state').className = "telemetry-value green";
+                    document.getElementById('tel-docked').innerText = "BLOQUEADO";
+                    document.getElementById('tel-docked').className = "telemetry-value green";
+                    document.getElementById('tel-pos-uav').innerText = "DOCKED";
+                    document.getElementById('tel-pos-uav').className = "telemetry-value green";
+
+                    ugv.isDocked = true;
+                    uav.x = ugv.x;
+                    uav.y = ugv.y;
+                    uav.altitude = 0;
+
+                    // Recharge UAV battery slowly while docked
+                    if (uav.battery < 100) {
+                        uav.battery = Math.min(100.0, uav.battery + uav.chargeRate);
+                    }
+
+                    // Steer UGV towards human
+                    if (distanceToTarget > ugv.targetDist) {
+                        // Calculate angle to target
+                        const angleToHuman = Math.atan2(human.y - ugv.y, human.x - ugv.x);
+                        // Smoothly rotate UGV angle
+                        let angleDiff = angleToHuman - ugv.angle;
+                        // Normalize angle
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                        ugv.angle += angleDiff * 0.1;
+
+                        // Drive forward
+                        const step_x = ugv.x + Math.cos(ugv.angle) * ugv.speed;
+                        const step_y = ugv.y + Math.sin(ugv.angle) * ugv.speed;
+
+                        // Check if driving forward is in low transitability zone
+                        const forwardT = getTransitability(step_x, step_y);
+                        
+                        if (forwardT < 0.4) {
+                            // TRANSITABILITY DROP DETECTED!
+                            ugv.state = 'DEPLOY_UAV';
+                            addLog("[ALERTA] [HARES_BT]: Transitabilidad de ruta T(x,y) < 0.40 detectada!", 'warn');
+                            addLog("[INFO] [HARES_BT]: Transición de comportamiento: FOLLOW_GROUND -> DEPLOY_UAV", 'info');
+                        } else {
+                            // Check collisions with solid walls
+                            if (!isPointInObstacles(step_x, step_y, 14)) {
+                                ugv.x = step_x;
+                                ugv.y = step_y;
+                            }
+                        }
+                    }
+                    break;
+
+                case 'DEPLOY_UAV':
+                    btNodes['deploy'].className = 'bt-node running';
+                    document.getElementById('tel-state').innerText = "DEPLOY_UAV";
+                    document.getElementById('tel-state').className = "telemetry-value amber";
+                    document.getElementById('tel-docked').innerText = "APERTURA / LIBERANDO";
+                    document.getElementById('tel-docked').className = "telemetry-value amber";
+                    document.getElementById('tel-pos-uav').innerText = `TAKEOFF (ALT: ${Math.round(uav.altitude)}m)`;
+                    document.getElementById('tel-pos-uav').className = "telemetry-value amber";
+
+                    ugv.isDocked = false;
+                    
+                    // UAV Vertical Takeoff Animation
+                    if (uav.altitude < uav.maxAltitude) {
+                        uav.altitude += 0.8;
+                    } else {
+                        // Launch completed. Switch to aerial tracking mode.
+                        ugv.state = 'GROUND_REPLAN';
+                        addLog("[INFO] [PX4_AUTO]: Dron desplegado. Transición a OFFBOARD_AERIAL_FOLLOW.", 'success');
+                        addLog("[INFO] [HARES_BT]: UGV inicia replanificación autónoma Nav2 alrededor del obstáculo.", 'info');
+                    }
+                    break;
+
+                case 'GROUND_REPLAN':
+                case 'AERIAL_FOLLOW':
+                    // Both represents the phase where UAV follows target and UGV reroutes
+                    btNodes['aerial'].className = 'bt-node running';
+                    document.getElementById('tel-state').innerText = "AERIAL_FOLLOW";
+                    document.getElementById('tel-state').className = "telemetry-value blue";
+                    document.getElementById('tel-docked').innerText = "DESACOPLADO";
+                    document.getElementById('tel-docked').className = "telemetry-value red";
+                    document.getElementById('tel-pos-uav').innerText = `X: ${(uav.x/20).toFixed(1)}, Y: ${((h-uav.y)/20).toFixed(1)}`;
+                    document.getElementById('tel-pos-uav').className = "telemetry-value blue";
+
+                    // UAV flies fast towards human target
+                    const uavAngle = Math.atan2(human.y - uav.y, human.x - uav.x);
+                    const uav_dx = Math.cos(uavAngle) * uav.speed;
+                    const uav_dy = Math.sin(uavAngle) * uav.speed;
+
+                    uav.x += uav_dx;
+                    uav.y += uav_dy;
+
+                    // Hover effect
+                    uav.hoverSine += 0.08;
+                    uav.altitude = uav.maxAltitude + Math.sin(uav.hoverSine) * 2;
+
+                    // Consume UAV battery
+                    uav.battery = Math.max(0.0, uav.battery - uav.dischargeRate);
+
+                    // Replan UGV navigation target around the impassable canyon barrier
+                    const bypassWaypoint = findReplanTarget(ugv.x, ugv.y, human.x, human.y);
+                    
+                    const distToWaypoint = dist(ugv.x, ugv.y, bypassWaypoint.x, bypassWaypoint.y);
+                    
+                    if (distToWaypoint > 15) {
+                        // Move UGV towards bypass waypoint (safe transitable path)
+                        const angleToBypass = Math.atan2(bypassWaypoint.y - ugv.y, bypassWaypoint.x - ugv.x);
+                        let angleDiff = angleToBypass - ugv.angle;
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                        ugv.angle += angleDiff * 0.1;
+
+                        const replan_step_x = ugv.x + Math.cos(ugv.angle) * ugv.speed;
+                        const replan_step_y = ugv.y + Math.sin(ugv.angle) * ugv.speed;
+
+                        if (!isPointInObstacles(replan_step_x, replan_step_y, 14)) {
+                            ugv.x = replan_step_x;
+                            ugv.y = replan_step_y;
+                        }
+                    }
+
+                    // CONDITION TO INITIATE RENDEZVOUS:
+                    // Both UGV and human target are on safe transitable ground, and obstacle is bypassed.
+                    const humanT = getTransitability(human.x, human.y);
+                    const ugvT = getTransitability(ugv.x, ugv.y);
+                    
+                    if (ugvT > 0.8 && humanT > 0.8 && Math.abs(ugv.y - human.y) < h * 0.45) {
+                        ugv.state = 'RENDEZVOUS';
+                        addLog("[INFO] [HARES_BT]: UGV sobre terreno seguro. Ordenando retorno y RENDEZVOUS espacial del UAV.", 'success');
+                    }
+                    break;
+
+                case 'RENDEZVOUS':
+                    btNodes['landing'].className = 'bt-node running';
+                    document.getElementById('tel-state').innerText = "RENDEZVOUS";
+                    document.getElementById('tel-state').className = "telemetry-value amber";
+
+                    // Drone flies back toward the Mother UGV's coordinates
+                    const distToUgv = dist(uav.x, uav.y, ugv.x, ugv.y);
+                    
+                    const rendezvousAngle = Math.atan2(ugv.y - uav.y, ugv.x - uav.x);
+                    uav.x += Math.cos(rendezvousAngle) * uav.speed;
+                    uav.y += Math.sin(rendezvousAngle) * uav.speed;
+
+                    // Hover altitude
+                    uav.hoverSine += 0.08;
+                    uav.altitude = uav.maxAltitude + Math.sin(uav.hoverSine) * 2;
+                    uav.battery = Math.max(0.0, uav.battery - uav.dischargeRate);
+
+                    // Also let UGV move slowly towards target if needed
+                    if (distanceToTarget > ugv.targetDist) {
+                        const angleToHuman = Math.atan2(human.y - ugv.y, human.x - ugv.x);
+                        let angleDiff = angleToHuman - ugv.angle;
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                        ugv.angle += angleDiff * 0.1;
+
+                        const step_x = ugv.x + Math.cos(ugv.angle) * (ugv.speed * 0.5);
+                        const step_y = ugv.y + Math.sin(ugv.angle) * (ugv.speed * 0.5);
+                        if (!isPointInObstacles(step_x, step_y, 14)) {
+                            ugv.x = step_x;
+                            ugv.y = step_y;
+                        }
+                    }
+
+                    // Once UAV is close to UGV horizontal plane (within 10 pixels), transition to LAND_DOCK descent
+                    if (distToUgv < 12) {
+                        ugv.state = 'LAND_DOCK';
+                        addLog("[INFO] [UAV_VISION]: Marcador de plataforma ArUco-01 detectado en cámara.", 'success');
+                        addLog("[INFO] [UAV_GNC]: Iniciando descenso de precisión y alineación angular.", 'info');
+                    }
+                    break;
+
+                case 'LAND_DOCK':
+                    btNodes['landing'].className = 'bt-node running';
+                    document.getElementById('tel-state').innerText = "LAND_DOCK";
+                    document.getElementById('tel-state').className = "telemetry-value red";
+                    document.getElementById('tel-pos-uav').innerText = `LANDING (ALT: ${Math.round(uav.altitude)}m)`;
+
+                    // Precisely glue UAV horizontal positions to UGV landing pad with small PID adjustment
+                    uav.x += (ugv.x - uav.x) * 0.25;
+                    uav.y += (ugv.y - uav.y) * 0.25;
+
+                    uav.battery = Math.max(0.0, uav.battery - uav.dischargeRate);
+
+                    // Descend vertically
+                    if (uav.altitude > 0) {
+                        uav.altitude -= 0.35;
+                    } else {
+                        // Touchdown & Lock!
+                        ugv.state = 'FOLLOW_GROUND';
+                        ugv.isDocked = true;
+                        addLog("[SUCCESS] [HARES_BMS]: Aterrizaje completado. Docking bloqueado mecánicamente.", 'success');
+                        addLog("[INFO] [HARES_BMS]: Iniciando carga inteligente por inducción.", 'info');
+                    }
+                    break;
+            }
+
+            // Consume UGV Battery slowly during travel
+            if (ugv.state !== 'FOLLOW_GROUND' || ugv.x !== 100 || ugv.y !== 500) {
+                ugv.battery = Math.max(0.0, ugv.battery - 0.01);
+            }
+
+            // Sync battery telemetry gauges
+            document.getElementById('tel-bat-ugv').innerText = `${ugv.battery.toFixed(1)}%`;
+            document.getElementById('tel-bat-ugv-bar').style.width = `${ugv.battery}%`;
+
+            document.getElementById('tel-bat-uav').innerText = `${uav.battery.toFixed(1)}%`;
+            const uavBar = document.getElementById('tel-bat-uav-bar');
+            uavBar.style.width = `${uav.battery}%`;
+            // Change battery gauge color based on level
+            if (uav.battery > 50) {
+                uavBar.className = "gauge-bar green";
+                document.getElementById('tel-bat-uav').className = "telemetry-value green";
+            } else if (uav.battery > 20) {
+                uavBar.className = "gauge-bar amber";
+                document.getElementById('tel-bat-uav').className = "telemetry-value amber";
+            } else {
+                uavBar.className = "gauge-bar red";
+                document.getElementById('tel-bat-uav').className = "telemetry-value red";
+            }
+
+            // Push trails
+            if (Math.random() < 0.2 && !ugv.isDocked) {
+                uav.trail.push({x: uav.x, y: uav.y, alt: uav.altitude});
+                if (uav.trail.length > 25) uav.trail.shift();
+            }
+            if (Math.random() < 0.15) {
+                ugv.trail.push({x: ugv.x, y: ugv.y});
+                if (ugv.trail.length > 25) ugv.trail.shift();
+            }
+        }
+
+        // Global draw and loop
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid overlay
+            drawGrid();
+
+            // Draw boundaries, zones and obstacles
+            drawObstacles();
+
+            // Draw Trails & Entities
+            drawHuman();
+            drawUGV();
+            drawUAV();
+
+            // Interlaced phosphor sweep line effect
+            const yLine = (Date.now() / 8) % canvas.height;
+            ctx.strokeStyle = 'rgba(234, 234, 234, 0.03)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, yLine);
+            ctx.lineTo(canvas.width, yLine);
+            ctx.stroke();
+        }
+
+        function loop() {
+            updateSimulation();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Set up event listeners for manual override buttons
+        document.getElementById('btn-deploy').addEventListener('click', () => {
+            if (ugv.state === 'FOLLOW_GROUND') {
+                ugv.state = 'DEPLOY_UAV';
+                addLog("[ANULACION_MANUAL]: Gatillando despegue forzado del UAV.", 'warn');
+            } else {
+                addLog("[ERROR] [HARES_BT]: Anulación denegada. El UAV ya está en vuelo o desplegándose.", 'error');
+            }
+        });
+
+        document.getElementById('btn-recall').addEventListener('click', () => {
+            if (ugv.state === 'GROUND_REPLAN' || ugv.state === 'AERIAL_FOLLOW') {
+                ugv.state = 'RENDEZVOUS';
+                addLog("[ANULACION_MANUAL]: Gatillando retorno y rendezvous forzado del UAV.", 'warn');
+            } else {
+                addLog("[ERROR] [HARES_BT]: Anulación denegada. El UAV debe estar en modo de seguimiento aéreo.", 'error');
+            }
+        });
+
+        document.getElementById('btn-env').addEventListener('click', () => {
+            terrainType = terrainType === 1 ? 2 : 1;
+            buildEnvironment();
+            addLog(`[ANULACION_MANUAL]: Cambiando entorno operativo a CONFIG_${terrainType}.`, 'warn');
+            addLog("RE-ESTIMANDO MAPAS DE TRANSITABILIDAD LOCAL...", 'info');
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            human.x = 150;
+            human.y = 100;
+            human.trail = [];
+
+            ugv.x = 100;
+            ugv.y = 500;
+            ugv.angle = -Math.PI / 2;
+            ugv.state = 'FOLLOW_GROUND';
+            ugv.isDocked = true;
+            ugv.battery = 100.0;
+            ugv.trail = [];
+
+            uav.x = 100;
+            uav.y = 500;
+            uav.altitude = 0;
+            uav.battery = 100.0;
+            uav.trail = [];
+
+            addLog("SIMULACION REINICIADA COMPLETAMENTE.", 'success');
+        });
+
+        // Run Loop
+        loop();
+    </script>
+</body>
+</html>
