@@ -3,7 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![ROS 2: Humble](https://img.shields.io/badge/ROS%202-Humble-blue)](https://docs.ros.org/en/humble/index.html)
 [![AI: YOLOv8](https://img.shields.io/badge/AI-YOLOv8-green)](https://ultralytics.com/)
-[![Simulation: Interactive](https://img.shields.io/badge/Simulator-Live-orange)](./simulator.html)
+[![Simulation: 2D](https://img.shields.io/badge/Simulator-2D-orange)](./simulator.html)
+[![Simulation: 3D](https://img.shields.io/badge/Simulator-3D-blue)](./simulator3d.html)
 
 **HARES** es un ecosistema robótico heterogéneo diseñado para el seguimiento autónomo de personas en entornos complejos. El sistema combina la autonomía energética de un **Rover Madre (UGV)** con la agilidad táctica de un **Dron de Apoyo (UAV)**, utilizando inteligencia artificial y árboles de comportamiento para decidir dinámicamente cuándo cambiar de modalidad de locomoción.
 
@@ -20,11 +21,15 @@ El problema central de la robótica de expedición es la transitabilidad. Los UG
 
 ---
 
-## 🎮 Simulador Interactivo
-Hemos desarrollado un simulador táctico 2D para validar la lógica del **Behavior Tree** del sistema. Puedes experimentar la toma de decisiones de HARES directamente en tu navegador.
+## 🎮 Simuladores interactivos
+Los prototipos de navegador comparten el mismo cerebro (`hares-bt.js`): un árbol de comportamiento a 10 Hz con vector de estado \(S_t\), lookahead de transitabilidad, replan A* y razones explícitas de cada decisión.
 
-*   **[Acceder al Simulador Táctico](./simulator.html)** (Requiere abrir el archivo localmente).
-*   **Controles:** Mueve al humano con `WASD` o `Flechas`. Observa cómo el Rover (azul) despliega al Dron (amarillo) al encontrar obstáculos.
+*   **[Simulador táctico 2D](./simulator.html)** — vista superior, cono de lookahead y path A*.
+*   **[Simulador táctico 3D](./simulator3d.html)** — Three.js, heatmap de \(T(x,y)\) y el mismo árbol.
+
+**Controles:** mueve al humano con `WASD` o flechas. El rover despliega el UAV si \(T_{fwd} < 0.4\) y la batería del dron es suficiente. Puedes forzar despegue/rendezvous; si \(E_{UAV} < 20\%\) (o \(E_{UGV} < 15\%\)) el árbol ejecuta RTL de emergencia. Cambia de entorno para recalcular el mapa de costos.
+
+Si el navegador bloquea scripts locales, sirve la carpeta (`npx serve`) y abre `/simulator.html`.
 
 ---
 
@@ -59,7 +64,9 @@ Para una guía detallada de construcción, consulta la [Guía de Implementación
 
 ## 📂 Estructura del Repositorio
 *   `HARES.md`: Documentación académica completa, estado del arte y formulación de hipótesis.
+*   `hares-bt.js`: Cerebro compartido (Behavior Tree + A* + vector \(S_t\)).
 *   `simulator.html`: Simulador interactivo 2D (HTML5/Canvas).
+*   `simulator3d.html`: Simulador interactivo 3D (Three.js).
 *   `HARES_V2_PHYSICAL_GUIDE.md`: Manual de hardware y arquitectura de software ROS 2.
 *   `hares_ws/`: (En desarrollo) Espacio de trabajo de ROS 2 para la implementación física.
 

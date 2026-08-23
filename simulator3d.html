@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[ HARES-3D-TACTICAL-SIM ]</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Archivo+Black&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0A0A0A;
+            --panel-bg: rgba(10, 10, 10, 0.88);
+            --fg-color: #EAEAEA;
+            --accent-red: #E61919;
+            --accent-green: #4AF626;
+            --accent-blue: #7AD4E8;
+            --accent-amber: #D4A017;
+            --font-mono: 'IBM Plex Mono', monospace;
+            --font-heavy: 'Archivo Black', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; border-radius: 0 !important; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-mono);
+            overflow: hidden;
+            height: 100dvh;
+        }
+
+        body::after {
+            content: " ";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%);
+            z-index: 100;
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.35;
+        }
+
+        #viewport { position: absolute; inset: 0; background: #000; }
+
+        .hud-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            grid-template-rows: auto 1fr auto;
+            gap: 12px;
+        }
+
+        .hud-top {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .glass {
+            background: var(--panel-bg);
+            border: 1px solid #2a2a2a;
+            pointer-events: auto;
+        }
+
+        .header-box {
+            border-left: 4px solid var(--accent-red);
+            padding: 10px 16px;
+        }
+
+        .header-box h1 {
+            font-family: var(--font-heavy);
+            font-size: 18px;
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+
+        .header-box span {
+            display: block;
+            font-size: 9px;
+            color: var(--accent-amber);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .sim-link {
+            color: var(--fg-color);
+            text-decoration: none;
+            border: 1px solid #444;
+            padding: 3px 7px;
+            font-size: 10px;
+            margin-right: 8px;
+        }
+
+        .sim-link:hover { border-color: var(--accent-amber); color: var(--accent-amber); }
+
+        .telemetry-box {
+            min-width: 240px;
+            padding: 8px 12px;
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .tel-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #222;
+            padding: 3px 0;
+        }
+
+        .tel-label { color: #777; }
+        .tel-val { font-weight: 700; }
+        .tel-val.ok { color: var(--accent-green); }
+        .tel-val.amber { color: var(--accent-amber); }
+        .tel-val.red { color: var(--accent-red); }
+        .tel-val.blue { color: var(--accent-blue); }
+
+        .hud-side {
+            grid-column: 2;
+            grid-row: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-self: start;
+            pointer-events: auto;
+        }
+
+        .side-box { padding: 10px; }
+
+        .side-k {
+            font-size: 8px;
+            letter-spacing: 0.14em;
+            color: var(--accent-amber);
+            margin-bottom: 6px;
+        }
+
+        .blackboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .bb-cell {
+            border: 1px solid #2a2a2a;
+            padding: 5px 6px;
+            font-size: 11px;
+        }
+
+        .bb-cell span {
+            display: block;
+            color: #777;
+            font-size: 8px;
+            letter-spacing: 0.08em;
+        }
+
+        .decision-box {
+            border-left: 4px solid var(--accent-red);
+            padding: 8px 10px;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .bt-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+
+        .bt-node {
+            border: 1px solid #222;
+            padding: 4px;
+            text-align: center;
+            color: #555;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .bt-node.running { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .bt-node.success { border-color: var(--accent-green); color: var(--accent-green); }
+        .bt-node.failure { border-color: var(--accent-red); color: var(--accent-red); }
+
+        .hud-bottom {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+        }
+
+        .console-box {
+            width: min(440px, 42vw);
+            height: 132px;
+            border: 1px solid #333;
+            padding: 8px;
+            font-size: 9px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-left: 2px solid #444;
+            padding-left: 6px;
+        }
+
+        .log-entry.success { border-left-color: var(--accent-green); }
+        .log-entry.warn { border-left-color: var(--accent-amber); }
+        .log-entry.error { border-left-color: var(--accent-red); }
+
+        .controls-box {
+            padding: 10px 12px;
+            min-width: 240px;
+            font-size: 10px;
+        }
+
+        .btn-action {
+            display: block;
+            width: 100%;
+            background: #000;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 7px 8px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+
+        .btn-action:hover { border-color: var(--accent-amber); color: var(--accent-amber); }
+        .btn-action:active { transform: translateY(1px); }
+        .btn-action:focus-visible { outline: 1px solid var(--accent-amber); outline-offset: 2px; }
+
+        .kbd-guide { margin-top: 8px; color: #666; line-height: 1.5; }
+        kbd {
+            background: #222;
+            padding: 1px 4px;
+            color: var(--accent-amber);
+            font-weight: 700;
+            border: 1px solid #444;
+        }
+
+        .reticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 28px;
+            height: 28px;
+            pointer-events: none;
+            z-index: 40;
+        }
+
+        .reticle::before, .reticle::after {
+            content: "";
+            position: absolute;
+            background: var(--accent-red);
+            opacity: 0.45;
+        }
+
+        .reticle::before { width: 100%; height: 1px; top: 50%; }
+        .reticle::after { height: 100%; width: 1px; left: 50%; }
+
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: #050505;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-heavy);
+            letter-spacing: 0.2em;
+        }
+
+        .loading-bar-container {
+            width: 280px;
+            height: 4px;
+            background: #111;
+            margin-top: 20px;
+            border: 1px solid #333;
+        }
+
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--accent-red);
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333; }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div style="font-size: 22px; letter-spacing: 0.28em;">HARES v2.0-BT</div>
+        <div style="font-size: 10px; font-family: var(--font-mono); color: #666; margin-top: 10px; letter-spacing: 0.12em;">INITIALIZING 3D SPATIAL COORDINATOR</div>
+        <div class="loading-bar-container"><div id="loading-bar"></div></div>
+    </div>
+
+    <div id="viewport"></div>
+    <div class="reticle"></div>
+
+    <div class="hud-overlay">
+        <div class="hud-top">
+            <div class="header-box glass">
+                <h1>HARES-3D MISSION MONITOR</h1>
+                <span>
+                    <a class="sim-link" href="simulator.html">[ SIM-2D ]</a>
+                    UNIT_ID: EXPEDITION-7 // BT 10 Hz
+                </span>
+            </div>
+            <div class="telemetry-box glass">
+                <div class="tel-row"><span class="tel-label">MODE</span><span id="tel-mode" class="tel-val">FOLLOW_GROUND</span></div>
+                <div class="tel-row"><span class="tel-label">DOCK</span><span id="tel-dock" class="tel-val ok">BLOQUEADO</span></div>
+                <div class="tel-row"><span class="tel-label">T / T_FWD</span><span id="tel-trans" class="tel-val">0.98 / 0.98</span></div>
+                <div class="tel-row"><span class="tel-label">BAT UGV</span><span id="tel-bat-ugv" class="tel-val">100%</span></div>
+                <div class="tel-row"><span class="tel-label">BAT UAV</span><span id="tel-bat-uav" class="tel-val">100%</span></div>
+                <div class="tel-row"><span class="tel-label">CAM</span><span id="tel-cam" class="tel-val">ORBIT</span></div>
+            </div>
+        </div>
+
+        <div class="hud-side">
+            <div class="side-box glass">
+                <div class="side-k">/// VECTOR S_t</div>
+                <div class="blackboard">
+                    <div class="bb-cell"><span>d_persona</span><strong id="bb-d">0.0</strong></div>
+                    <div class="bb-cell"><span>T_terreno</span><strong id="bb-t">1.00</strong></div>
+                    <div class="bb-cell"><span>E_bateria</span><strong id="bb-e">1.00</strong></div>
+                    <div class="bb-cell"><span>R_riesgo</span><strong id="bb-r">0.00</strong></div>
+                    <div class="bb-cell"><span>C_com</span><strong id="bb-c">1.00</strong></div>
+                    <div class="bb-cell"><span>U_inc</span><strong id="bb-u">0.00</strong></div>
+                </div>
+            </div>
+            <div class="decision-box glass">
+                <div class="side-k">/// DECISIÓN</div>
+                <div id="decision-text">Inicializando árbol de comportamiento.</div>
+            </div>
+            <div class="side-box glass">
+                <div class="side-k">/// HARES_BT</div>
+                <div class="bt-grid">
+                    <div id="bt-emergency" class="bt-node">Emergencia</div>
+                    <div id="bt-assess" class="bt-node">Evaluar T</div>
+                    <div id="bt-ground" class="bt-node">Tierra</div>
+                    <div id="bt-aerial" class="bt-node">Aire</div>
+                    <div id="bt-rendezvous" class="bt-node">Rendezvous</div>
+                    <div id="bt-land" class="bt-node">Land & Dock</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hud-bottom">
+            <div id="consoleLog" class="console-box glass"></div>
+            <div class="controls-box glass">
+                <button class="btn-action" id="btn-deploy" type="button">Lanzar Dron (Forzar)</button>
+                <button class="btn-action" id="btn-recall" type="button">Llamar Dron (Rendezvous)</button>
+                <button class="btn-action" id="btn-env" type="button">Cambiar Entorno</button>
+                <button class="btn-action" id="btn-obstacle" type="button">Generar Obstáculo (T)</button>
+                <button class="btn-action" id="btn-cam" type="button">Cámara POV / Órbita</button>
+                <button class="btn-action" id="btn-reset" type="button">Reiniciar Misión</button>
+                <div class="kbd-guide">
+                    HUMANO <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>
+                    CÁMARA <kbd>MOUSE</kbd> · el BT usa T_fwd, batería y LOS
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="hares-bt.js"></script>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const HARES_BT = window.HARES_BT;
+        let scene, camera, renderer, controls, clock;
+        let human, ugv, uav, envGroup, heatGroup, pathLine, wpMarker, lookSpheres;
+        let cameraMode = 'ORBIT';
+        let terrainType = 1;
+        let solids = [];
+        let rough = [];
+        let ugvHeading = Math.PI;
+        let lastDecision = null;
+        let ugvMoving = false;
+
+        const KEYS = {};
+        const STATE = { ugvBattery: 100, uavBattery: 100 };
+
+        const brain = HARES_BT.create({
+            lookaheadStep: 7,
+            lookaheadSteps: 6,
+            hoverAlt: 15,
+            landAlt: 1.8,
+            rendezvousDist: 3.5,
+            followDist: 16,
+            waypointSkip: 5,
+            pathCols: 32,
+            pathRows: 24,
+            tickHz: 10
+        });
+
+        const WORLD_BOUNDS = { minX: -140, minY: -140, maxX: 140, maxY: 140 };
+
+        function addLog(msg, type) {
+            type = type || 'info';
+            const log = document.getElementById('consoleLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.innerText = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+            log.prepend(entry);
+            while (log.children.length > 40) log.removeChild(log.lastChild);
+        }
+
+        function xzIn(x, z, b, pad) {
+            pad = pad || 0;
+            return x >= b.minX - pad && x <= b.maxX + pad && z >= b.minZ - pad && z <= b.maxZ + pad;
+        }
+
+        function isSolidXZ(x, z, pad) {
+            pad = pad == null ? 1.6 : pad;
+            for (let i = 0; i < solids.length; i++) {
+                if (xzIn(x, z, solids[i], pad)) return true;
+            }
+            return false;
+        }
+
+        function getT(x, z) {
+            if (isSolidXZ(x, z, 1.2)) return 0;
+            for (let i = 0; i < rough.length; i++) {
+                if (xzIn(x, z, rough[i], 0)) return 0.22;
+            }
+            return 0.98;
+        }
+
+        function makeWorld() {
+            return {
+                getT: function (x, y) { return getT(x, y); },
+                isSolid: function (x, y) { return isSolidXZ(x, y, 2.2); },
+                bounds: WORLD_BOUNDS,
+                human: { x: human.position.x, y: human.position.z },
+                ugv: { x: ugv.position.x, y: ugv.position.z, heading: ugvHeading, battery: STATE.ugvBattery },
+                uav: { x: uav.position.x, y: uav.position.z, alt: uav.position.y, battery: STATE.uavBattery, docked: !!(lastDecision && lastDecision.intent.docked) },
+                commsOk: true
+            };
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070707);
+            scene.fog = new THREE.Fog(0x070707, 70, 280);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 800);
+            camera.position.set(70, 55, 90);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            document.getElementById('viewport').appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 0, 10);
+
+            scene.add(new THREE.HemisphereLight(0x9aa0a6, 0x1a120c, 0.55));
+            const sun = new THREE.DirectionalLight(0xf2efe6, 0.85);
+            sun.position.set(80, 120, 40);
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(1024, 1024);
+            scene.add(sun);
+
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(400, 400),
+                new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95, metalness: 0.05 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            scene.add(new THREE.GridHelper(400, 80, 0x2a2a2a, 0x161616));
+
+            envGroup = new THREE.Group();
+            heatGroup = new THREE.Group();
+            scene.add(envGroup);
+            scene.add(heatGroup);
+
+            createEntities();
+            createPathViz();
+            buildEnvironment();
+
+            clock = new THREE.Clock();
+            window.addEventListener('keydown', function (e) { KEYS[e.code] = true; });
+            window.addEventListener('keyup', function (e) { KEYS[e.code] = false; });
+            window.addEventListener('resize', onResize);
+
+            document.getElementById('btn-deploy').addEventListener('click', function () {
+                const r = brain.requestDeploy(makeWorld());
+                addLog('[ANULACION] ' + r.reason, r.ok ? 'warn' : 'error');
+            });
+            document.getElementById('btn-recall').addEventListener('click', function () {
+                const r = brain.requestRecall();
+                addLog('[ANULACION] ' + r.reason, r.ok ? 'warn' : 'error');
+            });
+            document.getElementById('btn-env').addEventListener('click', function () {
+                terrainType = terrainType === 1 ? 2 : 1;
+                buildEnvironment();
+                addLog('[ANULACION] Entorno CONFIG_' + terrainType + '. Recalculando T y A*.', 'warn');
+            });
+            document.getElementById('btn-obstacle').addEventListener('click', spawnObstacle);
+            document.getElementById('btn-cam').addEventListener('click', toggleView);
+            document.getElementById('btn-reset').addEventListener('click', resetSim);
+
+            animate();
+            const bar = document.getElementById('loading-bar');
+            let w = 0;
+            const boot = setInterval(function () {
+                w += 12;
+                bar.style.width = Math.min(w, 100) + '%';
+                if (w >= 100) {
+                    clearInterval(boot);
+                    document.getElementById('loader').style.display = 'none';
+                    addLog('HARES v2.0-BT READY. Árbol compartido en línea.', 'success');
+                    addLog('[HARES_BT] FOLLOW_GROUND. Cruza el cañón para forzar despliegue.', 'info');
+                }
+            }, 80);
+        }
+
+        function disposeGroup(g) {
+            while (g.children.length) {
+                const c = g.children[0];
+                g.remove(c);
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) {
+                    if (Array.isArray(c.material)) c.material.forEach(function (m) { m.dispose(); });
+                    else c.material.dispose();
+                }
+            }
+        }
+
+        function addSolid(minX, maxX, minZ, maxZ, h) {
+            h = h || 10;
+            const w = maxX - minX;
+            const d = maxZ - minZ;
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(w, h, d),
+                new THREE.MeshStandardMaterial({ color: 0x2a0c0c, roughness: 0.92 })
+            );
+            mesh.position.set((minX + maxX) / 2, h / 2, (minZ + maxZ) / 2);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            envGroup.add(mesh);
+            solids.push({ minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ });
+        }
+
+        function addRough(minX, maxX, minZ, maxZ) {
+            const w = maxX - minX;
+            const d = maxZ - minZ;
+            const mesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(w, d),
+                new THREE.MeshBasicMaterial({
+                    color: 0xd4a017,
+                    transparent: true,
+                    opacity: 0.13,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                })
+            );
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set((minX + maxX) / 2, 0.14, (minZ + maxZ) / 2);
+            envGroup.add(mesh);
+            rough.push({ minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ });
+        }
+
+        function buildHeatmap() {
+            disposeGroup(heatGroup);
+            const n = 22;
+            const min = -110, max = 110;
+            const cell = (max - min) / n;
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const x = min + (i + 0.5) * cell;
+                    const z = min + (j + 0.5) * cell;
+                    const T = getT(x, z);
+                    if (T >= 0.9) continue;
+                    const col = T < 0.05 ? 0x5a1010 : 0x5a3a08;
+                    const tile = new THREE.Mesh(
+                        new THREE.PlaneGeometry(cell * 0.92, cell * 0.92),
+                        new THREE.MeshBasicMaterial({
+                            color: col,
+                            transparent: true,
+                            opacity: T < 0.05 ? 0.28 : 0.16,
+                            depthWrite: false
+                        })
+                    );
+                    tile.rotation.x = -Math.PI / 2;
+                    tile.position.set(x, 0.08, z);
+                    heatGroup.add(tile);
+                }
+            }
+        }
+
+        function buildEnvironment() {
+            disposeGroup(envGroup);
+            solids = [];
+            rough = [];
+            if (terrainType === 1) {
+                addSolid(-140, 48, -9, 9, 11);
+                addRough(-140, 48, -30, 30);
+            } else {
+                addSolid(-48, -32, -70, -18, 12);
+                addSolid(8, 22, -8, 55, 12);
+                addSolid(-18, 16, -10, 6, 8);
+                addRough(-55, 40, -48, 36);
+            }
+            buildHeatmap();
+        }
+
+        function createEntities() {
+            const humanG = new THREE.Group();
+            const body = new THREE.Mesh(
+                new THREE.CapsuleGeometry(0.7, 1.6, 4, 8),
+                new THREE.MeshStandardMaterial({ color: 0x4AF626, emissive: 0x0d3a0d, roughness: 0.45 })
+            );
+            body.castShadow = true;
+            body.position.y = 1.5;
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(1.4, 0.04, 8, 24),
+                new THREE.MeshBasicMaterial({ color: 0x4AF626, transparent: true, opacity: 0.45 })
+            );
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = 0.08;
+            humanG.add(body, ring);
+            const hLight = new THREE.PointLight(0x4AF626, 0.6, 18);
+            hLight.position.y = 2;
+            humanG.add(hLight);
+            humanG.userData.ring = ring;
+            humanG.position.set(0, 0, -42);
+            human = humanG;
+            scene.add(human);
+
+            const rover = new THREE.Group();
+            const chassis = new THREE.Mesh(
+                new THREE.BoxGeometry(3.6, 1.1, 5.4),
+                new THREE.MeshStandardMaterial({ color: 0x1a2a2e, roughness: 0.55, metalness: 0.2 })
+            );
+            chassis.position.y = 1.05;
+            chassis.castShadow = true;
+            const stripe = new THREE.Mesh(
+                new THREE.BoxGeometry(3.62, 0.12, 5.42),
+                new THREE.MeshStandardMaterial({ color: 0x7AD4E8, emissive: 0x12343a, roughness: 0.4 })
+            );
+            stripe.position.y = 1.62;
+            const pad = new THREE.Mesh(
+                new THREE.CircleGeometry(1.15, 24),
+                new THREE.MeshBasicMaterial({ color: 0xf4f4f0, side: THREE.DoubleSide })
+            );
+            pad.rotation.x = -Math.PI / 2;
+            pad.position.y = 1.68;
+            const crossM = new THREE.MeshBasicMaterial({ color: 0x111111 });
+            const c1 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.04, 0.12), crossM);
+            const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 1.8), crossM);
+            c1.position.y = 1.71;
+            c2.position.y = 1.71;
+            const wheelG = new THREE.CylinderGeometry(0.42, 0.42, 0.35, 10);
+            const wheelM = new THREE.MeshStandardMaterial({ color: 0x222222 });
+            [[-1.6, 0.42, 1.7], [1.6, 0.42, 1.7], [-1.6, 0.42, -1.7], [1.6, 0.42, -1.7]].forEach(function (p) {
+                const wh = new THREE.Mesh(wheelG, wheelM);
+                wh.rotation.z = Math.PI / 2;
+                wh.position.set(p[0], p[1], p[2]);
+                rover.add(wh);
+            });
+            rover.add(chassis, stripe, pad, c1, c2);
+            rover.position.set(10, 0, 52);
+            ugvHeading = Math.atan2(-42 - 52, 0 - 10);
+            ugv = rover;
+            scene.add(ugv);
+
+            const drone = new THREE.Group();
+            const hub = new THREE.Mesh(
+                new THREE.BoxGeometry(0.7, 0.22, 0.7),
+                new THREE.MeshStandardMaterial({ color: 0x222222 })
+            );
+            drone.add(hub);
+            const armM = new THREE.MeshStandardMaterial({ color: 0xd4a017 });
+            const rotors = [];
+            for (let i = 0; i < 4; i++) {
+                const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 0.12), armM);
+                arm.rotation.y = Math.PI / 4 + i * Math.PI / 2;
+                drone.add(arm);
+                const rotor = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.55, 0.55, 0.04, 16),
+                    new THREE.MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.35 })
+                );
+                const a = Math.PI / 4 + i * Math.PI / 2;
+                rotor.position.set(Math.cos(a) * 1.15, 0.12, Math.sin(a) * 1.15);
+                drone.add(rotor);
+                rotors.push(rotor);
+            }
+            drone.userData.rotors = rotors;
+            drone.position.copy(ugv.position);
+            drone.position.y = 1.7;
+            uav = drone;
+            scene.add(uav);
+        }
+
+        function createPathViz() {
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(80 * 3);
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geo.setDrawRange(0, 0);
+            pathLine = new THREE.Line(geo, new THREE.LineBasicMaterial({
+                color: 0x7AD4E8,
+                transparent: true,
+                opacity: 0.7
+            }));
+            scene.add(pathLine);
+
+            wpMarker = new THREE.Mesh(
+                new THREE.RingGeometry(0.7, 1.05, 20),
+                new THREE.MeshBasicMaterial({ color: 0x7AD4E8, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+            );
+            wpMarker.rotation.x = -Math.PI / 2;
+            wpMarker.visible = false;
+            scene.add(wpMarker);
+
+            lookSpheres = [];
+            for (let i = 0; i < 4; i++) {
+                const s = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.45, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: 0xeaeaea })
+                );
+                s.visible = false;
+                scene.add(s);
+                lookSpheres.push(s);
+            }
+        }
+
+        function updatePathViz(decision) {
+            const pos = pathLine.geometry.attributes.position;
+            const path = decision.path || [];
+            const n = Math.min(path.length, 80);
+            for (let i = 0; i < n; i++) {
+                pos.setXYZ(i, path[i].x, 0.4, path[i].y);
+            }
+            pathLine.geometry.setDrawRange(0, n);
+            pos.needsUpdate = true;
+
+            const wp = decision.intent.ugvWaypoint;
+            if (wp && !decision.intent.holdUgv && path.length > 1) {
+                wpMarker.visible = true;
+                wpMarker.position.set(wp.x, 0.35, wp.y);
+            } else {
+                wpMarker.visible = false;
+            }
+
+            const samples = decision.lookahead || [];
+            lookSpheres.forEach(function (s, i) {
+                if (samples[i]) {
+                    s.visible = true;
+                    s.position.set(samples[i].x, 0.6, samples[i].y);
+                    const T = samples[i].T;
+                    s.material.color.set(T < 0.4 ? 0xE61919 : (T < 0.8 ? 0xD4A017 : 0xeaeaea));
+                } else s.visible = false;
+            });
+        }
+
+        function moveOnXZ(obj, tx, tz, speed, delta, radius, stayOnSafe) {
+            const dx = tx - obj.position.x;
+            const dz = tz - obj.position.z;
+            const d = Math.hypot(dx, dz);
+            if (d < 0.15) return false;
+            const step = Math.min(speed * delta, d);
+            const nx = obj.position.x + (dx / d) * step;
+            const nz = obj.position.z + (dz / d) * step;
+            if (isSolidXZ(nx, nz, radius)) return false;
+            const nextT = getT(nx, nz);
+            const curT = getT(obj.position.x, obj.position.z);
+            if (stayOnSafe && nextT < 0.4 && nextT <= curT) return false;
+            obj.position.x = nx;
+            obj.position.z = nz;
+            obj.lookAt(obj.position.x + dx, obj.position.y, obj.position.z + dz);
+            return true;
+        }
+
+        function updateHuman(delta) {
+            const move = new THREE.Vector3();
+            if (KEYS['KeyW'] || KEYS['ArrowUp']) move.z -= 1;
+            if (KEYS['KeyS'] || KEYS['ArrowDown']) move.z += 1;
+            if (KEYS['KeyA'] || KEYS['ArrowLeft']) move.x -= 1;
+            if (KEYS['KeyD'] || KEYS['ArrowRight']) move.x += 1;
+            if (move.length() > 0) {
+                move.normalize().multiplyScalar(15 * delta);
+                const nx = human.position.x + move.x;
+                const nz = human.position.z + move.z;
+                if (!isSolidXZ(nx, human.position.z, 1.1)) human.position.x = nx;
+                if (!isSolidXZ(human.position.x, nz, 1.1)) human.position.z = nz;
+                human.position.x = THREE.MathUtils.clamp(human.position.x, -130, 130);
+                human.position.z = THREE.MathUtils.clamp(human.position.z, -130, 130);
+            }
+            const ring = human.userData.ring;
+            if (ring) {
+                const s = 1 + Math.sin(performance.now() / 180) * 0.12;
+                ring.scale.set(s, s, s);
+            }
+        }
+
+        function logMode(decision) {
+            const reason = '[HARES_BT] ' + decision.intent.reason;
+            if (decision.mode === 'EMERGENCY_RTL') addLog(reason, 'error');
+            else if (decision.mode === 'DEPLOY_UAV' || decision.mode === 'RENDEZVOUS') addLog(reason, 'warn');
+            else if (decision.mode === 'FOLLOW_GROUND' && (decision.prevMode === 'LAND_DOCK' || decision.prevMode === 'EMERGENCY_RTL')) {
+                addLog(reason, 'success');
+            } else if (decision.mode === 'AERIAL_FOLLOW') addLog(reason, 'success');
+            else addLog(reason, 'info');
+        }
+
+        function syncBt(tree) {
+            const map = {
+                emergency: 'bt-emergency', assess: 'bt-assess', ground: 'bt-ground',
+                aerial: 'bt-aerial', rendezvous: 'bt-rendezvous', land: 'bt-land'
+            };
+            tree.forEach(function (n) {
+                const el = document.getElementById(map[n.id]);
+                if (!el) return;
+                const st = n.status.toLowerCase();
+                el.className = 'bt-node' + (st === 'idle' ? '' : ' ' + st);
+            });
+        }
+
+        function riskClass(T) {
+            if (T < 0.4) return 'red';
+            if (T < 0.8) return 'amber';
+            return '';
+        }
+
+        function updateUI(decision) {
+            const bb = decision.blackboard;
+            const intent = decision.intent;
+            document.getElementById('tel-mode').innerText = decision.mode;
+            document.getElementById('tel-mode').className = 'tel-val ' + (
+                decision.mode === 'EMERGENCY_RTL' ? 'red' :
+                decision.mode === 'AERIAL_FOLLOW' ? 'blue' :
+                decision.mode === 'FOLLOW_GROUND' ? '' : 'amber'
+            );
+            document.getElementById('tel-dock').innerText = intent.docked ? 'BLOQUEADO' : 'DESACOPLADO';
+            document.getElementById('tel-dock').className = 'tel-val ' + (intent.docked ? 'ok' : 'red');
+            document.getElementById('tel-trans').innerText = bb.T_terreno.toFixed(2) + ' / ' + bb.T_fwd.toFixed(2);
+            document.getElementById('tel-trans').className = 'tel-val ' + riskClass(Math.min(bb.T_terreno, bb.T_fwd));
+            document.getElementById('tel-bat-ugv').innerText = STATE.ugvBattery.toFixed(0) + '%';
+            document.getElementById('tel-bat-uav').innerText = STATE.uavBattery.toFixed(0) + '%';
+            document.getElementById('tel-bat-uav').className = 'tel-val ' + (STATE.uavBattery < 20 ? 'red' : (STATE.uavBattery < 50 ? 'amber' : ''));
+            document.getElementById('tel-cam').innerText = cameraMode;
+            document.getElementById('bb-d').innerText = bb.d_persona.toFixed(1) + ' m';
+            document.getElementById('bb-t').innerText = bb.T_terreno.toFixed(2);
+            document.getElementById('bb-e').innerText = bb.E_bateria.toFixed(2);
+            document.getElementById('bb-r').innerText = bb.R_riesgo.toFixed(2);
+            document.getElementById('bb-c').innerText = bb.C_comunicacion.toFixed(2);
+            document.getElementById('bb-u').innerText = bb.U_incertidumbre.toFixed(2);
+            document.getElementById('decision-text').innerText = intent.reason;
+            syncBt(decision.tree);
+        }
+
+        function updateHares(delta) {
+            const decision = brain.tick(makeWorld());
+            lastDecision = decision;
+            if (decision.modeChanged) logMode(decision);
+            updatePathViz(decision);
+
+            const intent = decision.intent;
+            ugvMoving = false;
+
+            if (intent.docked) {
+                uav.position.x = ugv.position.x;
+                uav.position.z = ugv.position.z;
+                uav.position.y = 1.7;
+                STATE.uavBattery = Math.min(100, STATE.uavBattery + 12 * delta);
+            } else {
+                const tgt = intent.uavTarget;
+                const landing = decision.mode === 'LAND_DOCK' || (decision.mode === 'EMERGENCY_RTL' && uav.position.y < 5);
+                if (landing) {
+                    uav.position.x += (ugv.position.x - uav.position.x) * Math.min(1, 6 * delta);
+                    uav.position.z += (ugv.position.z - uav.position.z) * Math.min(1, 6 * delta);
+                    uav.position.y = Math.max(1.65, uav.position.y - 8 * delta);
+                } else {
+                    const dx = tgt.x - uav.position.x;
+                    const dz = tgt.y - uav.position.z;
+                    const d = Math.hypot(dx, dz);
+                    if (d > 0.15) {
+                        const step = Math.min(25 * delta, d);
+                        uav.position.x += (dx / d) * step;
+                        uav.position.z += (dz / d) * step;
+                    }
+                    const wantY = tgt.alt;
+                    if (uav.position.y < wantY) uav.position.y = Math.min(wantY, uav.position.y + 10 * delta);
+                    else uav.position.y = Math.max(wantY, uav.position.y - 6 * delta);
+                }
+                STATE.uavBattery = Math.max(0, STATE.uavBattery - 2.4 * delta);
+                uav.userData.rotors.forEach(function (r) { r.rotation.y += delta * 18; });
+            }
+
+            if (!intent.holdUgv && intent.ugvWaypoint) {
+                const wp = intent.ugvWaypoint;
+                if (Math.hypot(wp.x - ugv.position.x, wp.y - ugv.position.z) > 1.2) {
+                    const moved = moveOnXZ(ugv, wp.x, wp.y, 10 * (intent.ugvSpeedScale || 1), delta, 2.2, true);
+                    if (moved) {
+                        ugvMoving = true;
+                        ugvHeading = Math.atan2(wp.y - ugv.position.z, wp.x - ugv.position.x);
+                    }
+                }
+            }
+            if (ugvMoving) STATE.ugvBattery = Math.max(0, STATE.ugvBattery - 0.35 * delta);
+
+            updateUI(decision);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.05);
+            updateHuman(delta);
+            updateHares(delta);
+
+            if (cameraMode === 'THIRD_PERSON') {
+                const offset = new THREE.Vector3(0, 14, 22);
+                camera.position.copy(human.position).add(offset);
+                camera.lookAt(human.position.x, 1, human.position.z);
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function toggleView() {
+            cameraMode = cameraMode === 'ORBIT' ? 'THIRD_PERSON' : 'ORBIT';
+            controls.enabled = cameraMode === 'ORBIT';
+            addLog('Cámara: ' + cameraMode, 'info');
+        }
+
+        function resetSim() {
+            human.position.set(0, 0, -42);
+            ugv.position.set(10, 0, 52);
+            uav.position.set(10, 1.7, 52);
+            STATE.ugvBattery = 100;
+            STATE.uavBattery = 100;
+            ugvHeading = Math.atan2(-42 - 52, 0 - 10);
+            brain.reset();
+            lastDecision = null;
+            addLog('MISIÓN REINICIADA. BT en FOLLOW_GROUND.', 'warn');
+        }
+
+        function spawnObstacle() {
+            const ox = human.position.x + (Math.random() - 0.5) * 28;
+            const oz = human.position.z + (Math.random() - 0.5) * 28;
+            addSolid(ox - 5, ox + 5, oz - 5, oz + 5, 8);
+            addRough(ox - 10, ox + 10, oz - 10, oz + 10);
+            buildHeatmap();
+            addLog('LIDAR: obstáculo local insertado. T degradada en radio 10 m.', 'info');
+        }
+
+        init();
+    </script>
+</body>
+</html>
