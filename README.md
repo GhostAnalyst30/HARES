@@ -11,7 +11,7 @@
 ---
 
 ## 🚀 Visión del Proyecto
-El problema central de la robótica de expedición es la transitabilidad. Los UGVs son robustos pero se bloquean ante obstáculos; los UAVs son ágiles pero tienen batería limitada. **HARES** resuelve esto mediante una **coordinación adaptativa**: el Rover lidera la misión terrestre y, solo cuando el terreno es intransitable ($T(x,y) < 0.4$), despliega al UAV para mantener el contacto visual mientras el Rover replanifica su ruta.
+El problema central de la robótica de expedición es la transitabilidad. Los UGVs son robustos pero se bloquean ante obstáculos; los UAVs son ágiles pero tienen batería limitada. **HARES** resuelve esto mediante **coordinación adaptativa**: el rover cambia de ruedas a patas en terreno difícil y solo desacopla el UAV cuando un score de necesidad supera una cota dinámica (sin ruta terrestre, desvío excesivo, contacto en riesgo y energía suficiente).
 
 ### Características Clave:
 *   **Decisión Adaptativa:** Basada en mapas de transitabilidad física y semántica.
@@ -22,12 +22,12 @@ El problema central de la robótica de expedición es la transitabilidad. Los UG
 ---
 
 ## 🎮 Simuladores interactivos
-Los prototipos de navegador comparten el mismo cerebro (`hares-bt.js`): un árbol de comportamiento a 10 Hz con vector de estado \(S_t\), lookahead de transitabilidad, replan A* y razones explícitas de cada decisión.
+Los prototipos de navegador comparten el mismo cerebro (`hares-bt.js`): árbol a 10 Hz, locomoción **ruedas/patas**, umbral de despliegue **dinámico** (`need` vs `gate`) y replan A*.
 
-*   **[Simulador táctico 2D](./simulator.html)** — vista superior, cono de lookahead y path A*.
-*   **[Simulador táctico 3D](./simulator3d.html)** — Three.js, heatmap de \(T(x,y)\) y el mismo árbol.
+*   **[Simulador táctico 2D](./simulator.html)** — vista superior, morph llantas→patas, path A*.
+*   **[Simulador táctico 3D](./simulator3d.html)** — relieve (colinas, cresta, dunas), pendiente → \(T\), el mismo árbol.
 
-**Controles:** mueve al humano con `WASD` o flechas. El rover despliega el UAV si \(T_{fwd} < 0.4\) y la batería del dron es suficiente. Puedes forzar despegue/rendezvous; si \(E_{UAV} < 20\%\) (o \(E_{UGV} < 15\%\)) el árbol ejecuta RTL de emergencia. Cambia de entorno para recalcular el mapa de costos.
+**Controles:** `WASD` / flechas. En arena o pendiente el rover **frena las llantas y camina**. El dron no despega por un $T$ fijo: solo si `need > gate`. Forzar despegue/rendezvous sigue disponible; $E_{UAV}<20\%$ o $E_{UGV}<15\%$ dispara RTL.
 
 Si el navegador bloquea scripts locales, sirve la carpeta (`npx serve`) y abre `/simulator.html`.
 

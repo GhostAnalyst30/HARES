@@ -583,6 +583,14 @@
                         <span class="telemetry-label">POSICION UAV:</span>
                         <span id="tel-pos-uav" class="telemetry-value">DOCKED</span>
                     </div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">LOCOMOCIÓN UGV:</span>
+                        <span id="tel-loco" class="telemetry-value">RUEDAS</span>
+                    </div>
+                    <div class="telemetry-row">
+                        <span class="telemetry-label">NEED / GATE AÉREO:</span>
+                        <span id="tel-airscore" class="telemetry-value">0.00 / 0.40</span>
+                    </div>
                 </div>
 
                 <div class="control-group">
@@ -605,13 +613,13 @@
                     <div class="legend-item"><div class="legend-color" style="background-color: #4AF626;"></div><span>Persona objetivo</span></div>
                     <div class="legend-item"><div class="legend-color" style="background-color: #7AD4E8;"></div><span>Rover Madre (UGV)</span></div>
                     <div class="legend-item"><div class="legend-color" style="background-color: #E61919;"></div><span>Obstáculo sólido</span></div>
-                    <div class="legend-item"><div class="legend-color" style="background-color: rgba(212, 160, 23, 0.35); border: 1px dashed var(--accent-amber);"></div><span>Terreno T baja</span></div>
+                    <div class="legend-item"><div class="legend-color" style="background-color: rgba(212, 160, 23, 0.35); border: 1px dashed var(--accent-amber);"></div><span>Terreno T baja (patas)</span></div>
                     <div class="legend-item"><div class="legend-color" style="background-color: #7AD4E8; opacity: 0.4;"></div><span>Path A* / lookahead</span></div>
                 </div>
                 <div class="controls-overlay">
                     <div>CONTROLES HUMANO</div>
                     <div>Mover: <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> / flechas</div>
-                    <div style="color: var(--accent-amber); margin-top: 4px;">Cruza arena o cañón. El BT decide con T_fwd, batería y LOS.</div>
+                    <div style="color: var(--accent-amber); margin-top: 4px;">Arena → patas. El dron solo si need &gt; gate (muro / desvío / contacto).</div>
                 </div>
                 <canvas id="simCanvas"></canvas>
             </div>
@@ -694,7 +702,7 @@
         const human = { x: spawn.hx, y: spawn.hy, radius: 8, speed: 3, color: '#4AF626', trail: [] };
         const ugv = {
             x: spawn.ux, y: spawn.uy, width: 28, height: 18, speed: 2.0, angle: -Math.PI / 2,
-            color: '#7AD4E8', battery: 100.0, isDocked: true, trail: []
+            color: '#7AD4E8', battery: 100.0, isDocked: true, trail: [], legMorph: 0, lastLoco: 'WHEEL'
         };
         const uav = {
             x: spawn.ux, y: spawn.uy, radius: 6, altitude: 0, maxAltitude: 25, speed: 4.5,
@@ -708,7 +716,7 @@
             hoverAlt: 25,
             landAlt: 0.55,
             rendezvousDist: 14,
-            followDist: 85,
+            followDist: 20,
             waypointSkip: 22,
             pathCols: 32,
             pathRows: 24,
@@ -810,7 +818,7 @@
             const nextT = getTransitability(stepX, stepY);
             const curT = getTransitability(ugv.x, ugv.y);
             if (isPointInObstacles(stepX, stepY, 14)) return false;
-            if (nextT >= 0.4 || nextT > curT) {
+            if (nextT >= 0.16 || nextT > curT) {
                 ugv.x = stepX;
                 ugv.y = stepY;
                 return true;
@@ -934,6 +942,15 @@
             document.getElementById('bb-r').innerText = bb.R_riesgo.toFixed(2);
             document.getElementById('bb-cu').innerText = bb.C_comunicacion.toFixed(2) + ' / ' + bb.U_incertidumbre.toFixed(2);
             document.getElementById('decision-text').innerText = intent.reason;
+            const loco = intent.locomotion || 'WHEEL';
+            const locoEl = document.getElementById('tel-loco');
+            locoEl.innerText = loco === 'LEG' ? 'PATAS (LLANTAS FRENO)' : 'RUEDAS';
+            locoEl.className = 'telemetry-value ' + (loco === 'LEG' ? 'amber' : '');
+            const need = bb.deploy_need != null ? bb.deploy_need : 0;
+            const gate = bb.deploy_gate != null ? bb.deploy_gate : 0.4;
+            const airEl = document.getElementById('tel-airscore');
+            airEl.innerText = need.toFixed(2) + ' / ' + gate.toFixed(2);
+            airEl.className = 'telemetry-value ' + (need > gate ? 'amber' : '');
             syncBtPanel(decision.tree);
         }
 
@@ -941,10 +958,16 @@
             updateHuman();
             const decision = brain.tick(makeWorld());
             lastDecision = decision;
-            if (decision.modeChanged) logMode(decision);
-
             const intent = decision.intent;
+            if (decision.modeChanged) logMode(decision);
+            if (intent.locomotion && intent.locomotion !== ugv.lastLoco) {
+                ugv.lastLoco = intent.locomotion;
+                addLog('[HARES_BT] Locomoción → ' + (intent.locomotion === 'LEG' ? 'PATAS (freno de llantas)' : 'RUEDAS'), 'warn');
+            }
+
             ugv.isDocked = !!intent.docked;
+            const wantMorph = intent.locomotion === 'LEG' ? 1 : 0;
+            ugv.legMorph += (wantMorph - ugv.legMorph) * 0.12;
 
             if (intent.docked) {
                 uav.x = ugv.x;
@@ -971,7 +994,7 @@
                 const wp = intent.ugvWaypoint;
                 if (dist(ugv.x, ugv.y, wp.x, wp.y) > 10) {
                     const moved = steerUgvToward(wp.x, wp.y, intent.ugvSpeedScale || 1);
-                    if (moved) ugv.battery = Math.max(0, ugv.battery - 0.01);
+                    if (moved) ugv.battery = Math.max(0, ugv.battery - (intent.locomotion === 'LEG' ? 0.022 : 0.01));
                 }
             }
 
@@ -1114,11 +1137,42 @@
             ctx.save();
             ctx.translate(ugv.x, ugv.y);
             ctx.rotate(ugv.angle);
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-ugv.width / 2 - 2, -ugv.height / 2 - 3, 10, 4);
-            ctx.fillRect(ugv.width / 2 - 8, -ugv.height / 2 - 3, 10, 4);
-            ctx.fillRect(-ugv.width / 2 - 2, ugv.height / 2 - 1, 10, 4);
-            ctx.fillRect(ugv.width / 2 - 8, ugv.height / 2 - 1, 10, 4);
+            const morph = ugv.legMorph || 0;
+            const corners = [
+                { x: -ugv.width / 2 + 2, y: -ugv.height / 2 - 2, ph: 0 },
+                { x: ugv.width / 2 - 4, y: -ugv.height / 2 - 2, ph: 1.6 },
+                { x: -ugv.width / 2 + 2, y: ugv.height / 2 + 2, ph: 3.1 },
+                { x: ugv.width / 2 - 4, y: ugv.height / 2 + 2, ph: 4.7 }
+            ];
+            corners.forEach(function (c) {
+                const gait = Math.sin(Date.now() / 95 + c.ph) * morph;
+                if (morph < 0.7) {
+                    ctx.fillStyle = '#2a2a2a';
+                    ctx.beginPath();
+                    ctx.arc(c.x + 4, c.y, 4.2 * (1 - morph * 0.35), 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#555';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                if (morph > 0.2) {
+                    ctx.strokeStyle = varAmber();
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    const hipX = c.x + 4;
+                    const hipY = c.y;
+                    const midX = hipX + 3;
+                    const midY = hipY + 7 + gait * 4;
+                    const footX = hipX - 2;
+                    const footY = hipY + 13 + gait * 2;
+                    ctx.moveTo(hipX, hipY);
+                    ctx.lineTo(midX, midY);
+                    ctx.lineTo(footX, footY);
+                    ctx.stroke();
+                    ctx.fillStyle = varAmber();
+                    ctx.fillRect(footX - 3, footY - 1, 6, 2);
+                }
+            });
             ctx.fillStyle = '#111';
             ctx.strokeStyle = ugv.color;
             ctx.lineWidth = 1.5;
@@ -1137,7 +1191,8 @@
             ctx.fillStyle = ugv.color;
             ctx.font = 'bold 8px ' + varMono();
             const mode = lastDecision ? lastDecision.mode : 'FOLLOW_GROUND';
-            ctx.fillText('UGV_ROVER [' + mode + ']', ugv.x + 18, ugv.y + 12);
+            const loco = lastDecision && lastDecision.intent ? lastDecision.intent.locomotion : 'WHEEL';
+            ctx.fillText('UGV [' + mode + '] ' + (loco === 'LEG' ? 'PATAS' : 'RUEDAS'), ugv.x + 18, ugv.y + 12);
         }
 
         function drawUAV() {
@@ -1221,7 +1276,7 @@
             const p = defaultPose();
             human.x = p.hx; human.y = p.hy; human.trail = [];
             ugv.x = p.ux; ugv.y = p.uy; ugv.angle = -Math.PI / 2;
-            ugv.isDocked = true; ugv.battery = 100; ugv.trail = [];
+            ugv.isDocked = true; ugv.battery = 100; ugv.trail = []; ugv.legMorph = 0; ugv.lastLoco = 'WHEEL';
             uav.x = p.ux; uav.y = p.uy; uav.altitude = 0; uav.battery = 100; uav.trail = [];
             buildEnvironment();
             brain.reset();

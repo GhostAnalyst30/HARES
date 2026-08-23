@@ -326,6 +326,8 @@
                 <div class="tel-row"><span class="tel-label">T / T_FWD</span><span id="tel-trans" class="tel-val">0.98 / 0.98</span></div>
                 <div class="tel-row"><span class="tel-label">BAT UGV</span><span id="tel-bat-ugv" class="tel-val">100%</span></div>
                 <div class="tel-row"><span class="tel-label">BAT UAV</span><span id="tel-bat-uav" class="tel-val">100%</span></div>
+                <div class="tel-row"><span class="tel-label">LOCO</span><span id="tel-loco" class="tel-val">RUEDAS</span></div>
+                <div class="tel-row"><span class="tel-label">NEED/GATE</span><span id="tel-airscore" class="tel-val">0.00 / 0.40</span></div>
                 <div class="tel-row"><span class="tel-label">CAM</span><span id="tel-cam" class="tel-val">ORBIT</span></div>
             </div>
         </div>
@@ -370,7 +372,7 @@
                 <button class="btn-action" id="btn-reset" type="button">Reiniciar Misión</button>
                 <div class="kbd-guide">
                     HUMANO <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><br>
-                    CÁMARA <kbd>MOUSE</kbd> · el BT usa T_fwd, batería y LOS
+                    CÁMARA <kbd>MOUSE</kbd> · patas en pendiente · dron si need &gt; gate
                 </div>
             </div>
         </div>
@@ -392,7 +394,7 @@
 
         const HARES_BT = window.HARES_BT;
         let scene, camera, renderer, controls, clock;
-        let human, ugv, uav, envGroup, heatGroup, pathLine, wpMarker, lookSpheres;
+        let human, ugv, uav, envGroup, heatGroup, pathLine, wpMarker, lookSpheres, terrainMesh;
         let cameraMode = 'ORBIT';
         let terrainType = 1;
         let solids = [];
@@ -400,6 +402,8 @@
         let ugvHeading = Math.PI;
         let lastDecision = null;
         let ugvMoving = false;
+        let legMorph = 0;
+        let lastLoco = 'WHEEL';
 
         const KEYS = {};
         const STATE = { ugvBattery: 100, uavBattery: 100 };
@@ -407,8 +411,8 @@
         const brain = HARES_BT.create({
             lookaheadStep: 7,
             lookaheadSteps: 6,
-            hoverAlt: 15,
-            landAlt: 1.8,
+            hoverAlt: 14,
+            landAlt: 2.1,
             rendezvousDist: 3.5,
             followDist: 16,
             waypointSkip: 5,
@@ -418,6 +422,40 @@
         });
 
         const WORLD_BOUNDS = { minX: -140, minY: -140, maxX: 140, maxY: 140 };
+
+        function heightAt(x, z) {
+            let h = 1.7 * Math.sin(x * 0.028) * Math.cos(z * 0.024);
+            h += 1.15 * Math.sin(x * 0.07 + 0.8) * Math.sin(z * 0.055);
+            h += 0.5 * Math.sin(x * 0.15 + z * 0.12);
+            if (terrainType === 1) {
+                const pass = THREE.MathUtils.smoothstep(40, 64, x);
+                const ridge = Math.exp(-((z / 8.2) * (z / 8.2)));
+                h += (14.2 * (1 - pass) + 1.1 * pass) * ridge;
+                const dune = Math.exp(-Math.pow((Math.abs(z) - 20) / 18, 2)) * (1 - pass);
+                h += 2.4 * Math.sin(x * 0.2) * Math.sin(z * 0.33) * dune;
+            } else {
+                function mound(mx, mz, amp, rad) {
+                    const dx = x - mx, dz = z - mz;
+                    return amp * Math.exp(-(dx * dx + dz * dz) / (rad * rad));
+                }
+                h += mound(-40, -44, 9.5, 15);
+                h += mound(16, 22, 8.2, 13);
+                h += mound(-6, -2, 6.4, 11);
+                h += mound(32, -28, 5.5, 12);
+            }
+            return h;
+        }
+
+        function slopeAt(x, z) {
+            const e = 1.6;
+            const dx = heightAt(x + e, z) - heightAt(x - e, z);
+            const dz = heightAt(x, z + e) - heightAt(x, z - e);
+            return Math.hypot(dx, dz) / (2 * e);
+        }
+
+        function isCliff(x, z) {
+            return slopeAt(x, z) > 1.22;
+        }
 
         function addLog(msg, type) {
             type = type || 'info';
@@ -436,6 +474,7 @@
 
         function isSolidXZ(x, z, pad) {
             pad = pad == null ? 1.6 : pad;
+            if (isCliff(x, z)) return true;
             for (let i = 0; i < solids.length; i++) {
                 if (xzIn(x, z, solids[i], pad)) return true;
             }
@@ -443,11 +482,15 @@
         }
 
         function getT(x, z) {
-            if (isSolidXZ(x, z, 1.2)) return 0;
-            for (let i = 0; i < rough.length; i++) {
-                if (xzIn(x, z, rough[i], 0)) return 0.22;
+            if (isCliff(x, z)) return 0;
+            for (let i = 0; i < solids.length; i++) {
+                if (xzIn(x, z, solids[i], 1.2)) return 0;
             }
-            return 0.98;
+            const s = slopeAt(x, z);
+            if (s > 1.22) return 0;
+            if (s > 0.52) return 0.22;
+            if (s > 0.28) return 0.48;
+            return Math.max(0.72, 0.98 - s * 0.55);
         }
 
         function makeWorld() {
@@ -457,7 +500,13 @@
                 bounds: WORLD_BOUNDS,
                 human: { x: human.position.x, y: human.position.z },
                 ugv: { x: ugv.position.x, y: ugv.position.z, heading: ugvHeading, battery: STATE.ugvBattery },
-                uav: { x: uav.position.x, y: uav.position.z, alt: uav.position.y, battery: STATE.uavBattery, docked: !!(lastDecision && lastDecision.intent.docked) },
+                uav: {
+                    x: uav.position.x,
+                    y: uav.position.z,
+                    alt: uav.position.y - heightAt(uav.position.x, uav.position.z),
+                    battery: STATE.uavBattery,
+                    docked: !!(lastDecision && lastDecision.intent.docked)
+                },
                 commsOk: true
             };
         }
@@ -465,10 +514,10 @@
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x070707);
-            scene.fog = new THREE.Fog(0x070707, 70, 280);
+            scene.fog = new THREE.Fog(0x070707, 90, 420);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 800);
-            camera.position.set(70, 55, 90);
+            camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 1200);
+            camera.position.set(85, 72, 110);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -478,23 +527,20 @@
 
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.target.set(0, 0, 10);
+            controls.target.set(0, 6, 8);
 
-            scene.add(new THREE.HemisphereLight(0x9aa0a6, 0x1a120c, 0.55));
-            const sun = new THREE.DirectionalLight(0xf2efe6, 0.85);
-            sun.position.set(80, 120, 40);
+            scene.add(new THREE.HemisphereLight(0x9aa0a6, 0x1a120c, 0.62));
+            const sun = new THREE.DirectionalLight(0xf2efe6, 0.9);
+            sun.position.set(90, 140, 50);
             sun.castShadow = true;
-            sun.shadow.mapSize.set(1024, 1024);
+            sun.shadow.mapSize.set(2048, 2048);
+            sun.shadow.camera.near = 10;
+            sun.shadow.camera.far = 400;
+            sun.shadow.camera.left = -120;
+            sun.shadow.camera.right = 120;
+            sun.shadow.camera.top = 120;
+            sun.shadow.camera.bottom = -120;
             scene.add(sun);
-
-            const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(400, 400),
-                new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.95, metalness: 0.05 })
-            );
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            scene.add(ground);
-            scene.add(new THREE.GridHelper(400, 80, 0x2a2a2a, 0x161616));
 
             envGroup = new THREE.Group();
             heatGroup = new THREE.Group();
@@ -537,7 +583,7 @@
                     clearInterval(boot);
                     document.getElementById('loader').style.display = 'none';
                     addLog('HARES v2.0-BT READY. Árbol compartido en línea.', 'success');
-                    addLog('[HARES_BT] FOLLOW_GROUND. Cruza el cañón para forzar despliegue.', 'info');
+                    addLog('[HARES_BT] Relieve activo. Arena/pendiente → patas. Dron solo si need > gate.', 'info');
                 }
             }, 80);
         }
@@ -558,78 +604,69 @@
             h = h || 10;
             const w = maxX - minX;
             const d = maxZ - minZ;
+            const cx = (minX + maxX) / 2;
+            const cz = (minZ + maxZ) / 2;
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(w, h, d),
                 new THREE.MeshStandardMaterial({ color: 0x2a0c0c, roughness: 0.92 })
             );
-            mesh.position.set((minX + maxX) / 2, h / 2, (minZ + maxZ) / 2);
+            mesh.position.set(cx, heightAt(cx, cz) + h / 2, cz);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             envGroup.add(mesh);
             solids.push({ minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ });
         }
 
-        function addRough(minX, maxX, minZ, maxZ) {
-            const w = maxX - minX;
-            const d = maxZ - minZ;
-            const mesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(w, d),
-                new THREE.MeshBasicMaterial({
-                    color: 0xd4a017,
-                    transparent: true,
-                    opacity: 0.13,
-                    side: THREE.DoubleSide,
-                    depthWrite: false
-                })
-            );
-            mesh.rotation.x = -Math.PI / 2;
-            mesh.position.set((minX + maxX) / 2, 0.14, (minZ + maxZ) / 2);
-            envGroup.add(mesh);
-            rough.push({ minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ });
+        function createTerrain() {
+            if (terrainMesh) {
+                scene.remove(terrainMesh);
+                terrainMesh.geometry.dispose();
+                terrainMesh.material.dispose();
+                terrainMesh = null;
+            }
+            const SEG = 128;
+            const SIZE = 360;
+            const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+            geo.rotateX(-Math.PI / 2);
+            const pos = geo.attributes.position;
+            const colors = new Float32Array(pos.count * 3);
+            const c = new THREE.Color();
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const y = heightAt(x, z);
+                pos.setY(i, y);
+                const T = getT(x, z);
+                if (T < 0.08) c.setHex(0x3a1410);
+                else if (T < 0.4) c.setHex(0x6a5428);
+                else if (y > 7) c.setHex(0x4a443c);
+                else c.setHex(0x2c322c);
+                colors[i * 3] = c.r;
+                colors[i * 3 + 1] = c.g;
+                colors[i * 3 + 2] = c.b;
+            }
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geo.computeVertexNormals();
+            terrainMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.93,
+                metalness: 0.04
+            }));
+            terrainMesh.receiveShadow = true;
+            scene.add(terrainMesh);
         }
 
-        function buildHeatmap() {
-            disposeGroup(heatGroup);
-            const n = 22;
-            const min = -110, max = 110;
-            const cell = (max - min) / n;
-            for (let i = 0; i < n; i++) {
-                for (let j = 0; j < n; j++) {
-                    const x = min + (i + 0.5) * cell;
-                    const z = min + (j + 0.5) * cell;
-                    const T = getT(x, z);
-                    if (T >= 0.9) continue;
-                    const col = T < 0.05 ? 0x5a1010 : 0x5a3a08;
-                    const tile = new THREE.Mesh(
-                        new THREE.PlaneGeometry(cell * 0.92, cell * 0.92),
-                        new THREE.MeshBasicMaterial({
-                            color: col,
-                            transparent: true,
-                            opacity: T < 0.05 ? 0.28 : 0.16,
-                            depthWrite: false
-                        })
-                    );
-                    tile.rotation.x = -Math.PI / 2;
-                    tile.position.set(x, 0.08, z);
-                    heatGroup.add(tile);
-                }
-            }
-        }
+        function buildHeatmap() {}
 
         function buildEnvironment() {
             disposeGroup(envGroup);
             solids = [];
             rough = [];
-            if (terrainType === 1) {
-                addSolid(-140, 48, -9, 9, 11);
-                addRough(-140, 48, -30, 30);
-            } else {
-                addSolid(-48, -32, -70, -18, 12);
-                addSolid(8, 22, -8, 55, 12);
-                addSolid(-18, 16, -10, 6, 8);
-                addRough(-55, 40, -48, 36);
+            createTerrain();
+            if (terrainType === 2) {
+                addSolid(-48, -32, -70, -18, 7);
+                addSolid(8, 22, -8, 55, 7);
             }
-            buildHeatmap();
         }
 
         function createEntities() {
@@ -651,7 +688,7 @@
             hLight.position.y = 2;
             humanG.add(hLight);
             humanG.userData.ring = ring;
-            humanG.position.set(0, 0, -42);
+            humanG.position.set(0, heightAt(0, -42), -42);
             human = humanG;
             scene.add(human);
 
@@ -678,16 +715,35 @@
             const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 1.8), crossM);
             c1.position.y = 1.71;
             c2.position.y = 1.71;
-            const wheelG = new THREE.CylinderGeometry(0.42, 0.42, 0.35, 10);
-            const wheelM = new THREE.MeshStandardMaterial({ color: 0x222222 });
-            [[-1.6, 0.42, 1.7], [1.6, 0.42, 1.7], [-1.6, 0.42, -1.7], [1.6, 0.42, -1.7]].forEach(function (p) {
+            const wheelG = new THREE.CylinderGeometry(0.42, 0.42, 0.38, 12);
+            const wheelM = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+            const legM = new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.45, metalness: 0.2 });
+            const modules = [];
+            const corners = [
+                { x: -1.6, z: 1.7, ph: 0 },
+                { x: 1.6, z: 1.7, ph: 1.7 },
+                { x: -1.6, z: -1.7, ph: 3.2 },
+                { x: 1.6, z: -1.7, ph: 4.8 }
+            ];
+            corners.forEach(function (c) {
+                const mod = new THREE.Group();
+                mod.position.set(c.x, 0.42, c.z);
                 const wh = new THREE.Mesh(wheelG, wheelM);
                 wh.rotation.z = Math.PI / 2;
-                wh.position.set(p[0], p[1], p[2]);
-                rover.add(wh);
+                wh.castShadow = true;
+                const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.15, 0.16), legM);
+                thigh.position.y = -0.15;
+                thigh.visible = false;
+                const shin = new THREE.Mesh(new THREE.BoxGeometry(0.13, 1.05, 0.13), legM);
+                shin.position.y = -1.0;
+                shin.visible = false;
+                mod.add(wh, thigh, shin);
+                rover.add(mod);
+                modules.push({ group: mod, wheel: wh, thigh: thigh, shin: shin, phase: c.ph });
             });
             rover.add(chassis, stripe, pad, c1, c2);
-            rover.position.set(10, 0, 52);
+            rover.position.set(10, heightAt(10, 52), 52);
+            rover.userData.modules = modules;
             ugvHeading = Math.atan2(-42 - 52, 0 - 10);
             ugv = rover;
             scene.add(ugv);
@@ -715,7 +771,7 @@
             }
             drone.userData.rotors = rotors;
             drone.position.copy(ugv.position);
-            drone.position.y = 1.7;
+            drone.position.y = heightAt(ugv.position.x, ugv.position.z) + 1.7;
             uav = drone;
             scene.add(uav);
         }
@@ -757,7 +813,7 @@
             const path = decision.path || [];
             const n = Math.min(path.length, 80);
             for (let i = 0; i < n; i++) {
-                pos.setXYZ(i, path[i].x, 0.4, path[i].y);
+                pos.setXYZ(i, path[i].x, heightAt(path[i].x, path[i].y) + 0.55, path[i].y);
             }
             pathLine.geometry.setDrawRange(0, n);
             pos.needsUpdate = true;
@@ -765,7 +821,7 @@
             const wp = decision.intent.ugvWaypoint;
             if (wp && !decision.intent.holdUgv && path.length > 1) {
                 wpMarker.visible = true;
-                wpMarker.position.set(wp.x, 0.35, wp.y);
+                wpMarker.position.set(wp.x, heightAt(wp.x, wp.y) + 0.4, wp.y);
             } else {
                 wpMarker.visible = false;
             }
@@ -774,7 +830,7 @@
             lookSpheres.forEach(function (s, i) {
                 if (samples[i]) {
                     s.visible = true;
-                    s.position.set(samples[i].x, 0.6, samples[i].y);
+                    s.position.set(samples[i].x, heightAt(samples[i].x, samples[i].y) + 0.7, samples[i].y);
                     const T = samples[i].T;
                     s.material.color.set(T < 0.4 ? 0xE61919 : (T < 0.8 ? 0xD4A017 : 0xeaeaea));
                 } else s.visible = false;
@@ -792,10 +848,11 @@
             if (isSolidXZ(nx, nz, radius)) return false;
             const nextT = getT(nx, nz);
             const curT = getT(obj.position.x, obj.position.z);
-            if (stayOnSafe && nextT < 0.4 && nextT <= curT) return false;
+            if (stayOnSafe && nextT < 0.16 && nextT <= curT) return false;
             obj.position.x = nx;
             obj.position.z = nz;
             obj.lookAt(obj.position.x + dx, obj.position.y, obj.position.z + dz);
+            obj.position.y = heightAt(obj.position.x, obj.position.z);
             return true;
         }
 
@@ -814,6 +871,7 @@
                 human.position.x = THREE.MathUtils.clamp(human.position.x, -130, 130);
                 human.position.z = THREE.MathUtils.clamp(human.position.z, -130, 130);
             }
+            human.position.y = heightAt(human.position.x, human.position.z);
             const ring = human.userData.ring;
             if (ring) {
                 const s = 1 + Math.sin(performance.now() / 180) * 0.12;
@@ -874,30 +932,62 @@
             document.getElementById('bb-c').innerText = bb.C_comunicacion.toFixed(2);
             document.getElementById('bb-u').innerText = bb.U_incertidumbre.toFixed(2);
             document.getElementById('decision-text').innerText = intent.reason;
+            const loco = intent.locomotion || 'WHEEL';
+            document.getElementById('tel-loco').innerText = loco === 'LEG' ? 'PATAS' : 'RUEDAS';
+            document.getElementById('tel-loco').className = 'tel-val ' + (loco === 'LEG' ? 'amber' : '');
+            const need = bb.deploy_need != null ? bb.deploy_need : 0;
+            const gate = bb.deploy_gate != null ? bb.deploy_gate : 0.4;
+            document.getElementById('tel-airscore').innerText = need.toFixed(2) + ' / ' + gate.toFixed(2);
+            document.getElementById('tel-airscore').className = 'tel-val ' + (need > gate ? 'amber' : '');
             syncBt(decision.tree);
+        }
+
+        function animateUgvLegs(delta, moving, locomotion) {
+            const want = locomotion === 'LEG' ? 1 : 0;
+            legMorph += (want - legMorph) * Math.min(1, 6 * delta);
+            const modules = ugv.userData.modules || [];
+            const t = performance.now() / 140;
+            modules.forEach(function (m) {
+                const gait = Math.sin(t + m.phase) * legMorph;
+                m.wheel.visible = legMorph < 0.82;
+                m.thigh.visible = legMorph > 0.22;
+                m.shin.visible = legMorph > 0.22;
+                if (locomotion !== 'LEG' && moving) m.wheel.rotation.x += delta * 10;
+                m.thigh.rotation.z = gait * 0.55;
+                m.shin.rotation.z = -gait * 0.35;
+                m.group.position.y = 0.42 + Math.max(0, gait) * 0.28;
+            });
         }
 
         function updateHares(delta) {
             const decision = brain.tick(makeWorld());
             lastDecision = decision;
             if (decision.modeChanged) logMode(decision);
-            updatePathViz(decision);
-
             const intent = decision.intent;
+            if (intent.locomotion && intent.locomotion !== lastLoco) {
+                lastLoco = intent.locomotion;
+                addLog('[HARES_BT] Locomoción → ' + (lastLoco === 'LEG' ? 'PATAS (llantas en freno)' : 'RUEDAS'), 'warn');
+            }
+            updatePathViz(decision);
             ugvMoving = false;
+
+            const ugvGround = heightAt(ugv.position.x, ugv.position.z);
+            ugv.position.y = ugvGround;
 
             if (intent.docked) {
                 uav.position.x = ugv.position.x;
                 uav.position.z = ugv.position.z;
-                uav.position.y = 1.7;
+                uav.position.y = ugvGround + 1.7;
                 STATE.uavBattery = Math.min(100, STATE.uavBattery + 12 * delta);
             } else {
                 const tgt = intent.uavTarget;
-                const landing = decision.mode === 'LAND_DOCK' || (decision.mode === 'EMERGENCY_RTL' && uav.position.y < 5);
+                const agl = uav.position.y - heightAt(uav.position.x, uav.position.z);
+                const landing = decision.mode === 'LAND_DOCK' || (decision.mode === 'EMERGENCY_RTL' && agl < 5);
                 if (landing) {
                     uav.position.x += (ugv.position.x - uav.position.x) * Math.min(1, 6 * delta);
                     uav.position.z += (ugv.position.z - uav.position.z) * Math.min(1, 6 * delta);
-                    uav.position.y = Math.max(1.65, uav.position.y - 8 * delta);
+                    const padY = heightAt(ugv.position.x, ugv.position.z) + 1.7;
+                    uav.position.y = Math.max(padY, uav.position.y - 8 * delta);
                 } else {
                     const dx = tgt.x - uav.position.x;
                     const dz = tgt.y - uav.position.z;
@@ -907,7 +997,7 @@
                         uav.position.x += (dx / d) * step;
                         uav.position.z += (dz / d) * step;
                     }
-                    const wantY = tgt.alt;
+                    const wantY = heightAt(uav.position.x, uav.position.z) + tgt.alt;
                     if (uav.position.y < wantY) uav.position.y = Math.min(wantY, uav.position.y + 10 * delta);
                     else uav.position.y = Math.max(wantY, uav.position.y - 6 * delta);
                 }
@@ -925,7 +1015,11 @@
                     }
                 }
             }
-            if (ugvMoving) STATE.ugvBattery = Math.max(0, STATE.ugvBattery - 0.35 * delta);
+            ugv.position.y = heightAt(ugv.position.x, ugv.position.z);
+            animateUgvLegs(delta, ugvMoving, intent.locomotion || 'WHEEL');
+            if (ugvMoving) {
+                STATE.ugvBattery = Math.max(0, STATE.ugvBattery - (intent.locomotion === 'LEG' ? 0.7 : 0.35) * delta);
+            }
 
             updateUI(decision);
         }
@@ -939,7 +1033,7 @@
             if (cameraMode === 'THIRD_PERSON') {
                 const offset = new THREE.Vector3(0, 14, 22);
                 camera.position.copy(human.position).add(offset);
-                camera.lookAt(human.position.x, 1, human.position.z);
+                camera.lookAt(human.position.x, human.position.y + 1.4, human.position.z);
             }
             controls.update();
             renderer.render(scene, camera);
@@ -958,12 +1052,14 @@
         }
 
         function resetSim() {
-            human.position.set(0, 0, -42);
-            ugv.position.set(10, 0, 52);
-            uav.position.set(10, 1.7, 52);
+            human.position.set(0, heightAt(0, -42), -42);
+            ugv.position.set(10, heightAt(10, 52), 52);
+            uav.position.set(10, heightAt(10, 52) + 1.7, 52);
             STATE.ugvBattery = 100;
             STATE.uavBattery = 100;
             ugvHeading = Math.atan2(-42 - 52, 0 - 10);
+            legMorph = 0;
+            lastLoco = 'WHEEL';
             brain.reset();
             lastDecision = null;
             addLog('MISIÓN REINICIADA. BT en FOLLOW_GROUND.', 'warn');
@@ -973,9 +1069,7 @@
             const ox = human.position.x + (Math.random() - 0.5) * 28;
             const oz = human.position.z + (Math.random() - 0.5) * 28;
             addSolid(ox - 5, ox + 5, oz - 5, oz + 5, 8);
-            addRough(ox - 10, ox + 10, oz - 10, oz + 10);
-            buildHeatmap();
-            addLog('LIDAR: obstáculo local insertado. T degradada en radio 10 m.', 'info');
+            addLog('LIDAR: obstáculo local insertado. T=0 en radio 5 m.', 'info');
         }
 
         init();

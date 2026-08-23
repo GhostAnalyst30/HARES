@@ -23,11 +23,13 @@
     };
 
     var DEFAULTS = {
-        tDeploy: 0.40,
-        tSafe: 0.80,
+        tWheel: 0.62,
+        tLeg: 0.16,
+        tSafe: 0.72,
         tBlocked: 0.05,
+        tDeploy: 0.40,
         batUavCritical: 20,
-        batUavMinDeploy: 25,
+        batUavMinDeploy: 22,
         batUgvCritical: 15,
         lookaheadSteps: 4,
         lookaheadStep: 18,
@@ -96,9 +98,20 @@
             var x = a.x + (b.x - a.x) * t;
             var y = a.y + (b.y - a.y) * t;
             if (world.isSolid(x, y)) return false;
-            if (world.getT(x, y) < tMin) return false;
+            if (tMin != null && world.getT(x, y) < tMin) return false;
         }
         return true;
+    }
+
+    function lineClear(world, a, b, n) {
+        return lineTransitable(world, a, b, null, n);
+    }
+
+    function pathLength(path) {
+        var L = 0;
+        if (!path || path.length < 2) return Infinity;
+        for (var i = 1; i < path.length; i++) L += dist(path[i - 1], path[i]);
+        return L;
     }
 
     function findSafeGoal(world, target, tSafe, cfg) {
@@ -139,7 +152,7 @@
             var p = gridToWorld(gx, gy, bounds, cols, rows);
             if (isStart) return true;
             if (world.isSolid(p.x, p.y)) return false;
-            return world.getT(p.x, p.y) >= cfg.tDeploy;
+            return world.getT(p.x, p.y) >= cfg.tLeg;
         }
 
         function cellT(gx, gy) {
@@ -249,12 +262,14 @@
         var lastTickAt = 0;
         var cached = null;
         var pendingOverride = null;
+        var loco = 'WHEEL';
 
         function reset() {
             mode = MODES.FOLLOW_GROUND;
             lastTickAt = 0;
             cached = null;
             pendingOverride = null;
+            loco = 'WHEEL';
         }
 
         function requestDeploy(world) {
@@ -313,6 +328,15 @@
             ];
         }
 
+        function pickLoco(Tnow) {
+            if (loco === 'LEG') {
+                if (Tnow >= cfg.tWheel + 0.08) loco = 'WHEEL';
+            } else if (Tnow < cfg.tWheel) {
+                loco = 'LEG';
+            }
+            return loco;
+        }
+
         function compute(world) {
             var prevMode = mode;
             var ugv = world.ugv;
@@ -330,6 +354,31 @@
             var R = clamp((1 - Tfwd) * 0.75 + (dPersona > cfg.followDist * 2.2 ? 0.25 : 0), 0, 1);
             var U = clamp((1 - C) * 0.45 + (1 - Tfwd) * 0.35 + (dPersona / Math.max(diag, 1)) * 0.20, 0, 1);
             var E = Math.min(uav.battery, ugv.battery) / 100;
+            var locomotion = pickLoco(Tnow);
+
+            var groundGoal = findSafeGoal(world, human, cfg.tLeg, cfg);
+            var groundPath = findPath(world, ugv, groundGoal, cfg);
+            var pLen = pathLength(groundPath);
+            var hasGroundRoute = groundPath.length > 1 && pLen < Infinity;
+            var detour = hasGroundRoute ? pLen / Math.max(dPersona, cfg.waypointSkip) : 99;
+            var losClear = lineClear(world, ugv, human, 14);
+            var contactRisk = clamp((dPersona / cfg.followDist - 1) / 3, 0, 1);
+            if (!losClear) contactRisk = Math.max(contactRisk, 0.5);
+
+            var deployNeed = 0;
+            if (!hasGroundRoute) deployNeed += 0.62;
+            else deployNeed += clamp((detour - 2.4) / 4.0, 0, 0.35);
+            deployNeed += 0.22 * contactRisk;
+            deployNeed += 0.12 * U;
+            deployNeed += 0.08 * R;
+            deployNeed = clamp(deployNeed, 0, 1);
+
+            var deployGate = 0.42
+                + 0.36 * (1 - uav.battery / 100)
+                + (hasGroundRoute ? 0.16 : 0)
+                - 0.08 * U
+                - (losClear ? 0 : 0.05);
+            deployGate = clamp(deployGate, 0.24, 0.84);
 
             var airborne = mode !== MODES.FOLLOW_GROUND;
             var criticalUav = uav.battery < cfg.batUavCritical;
@@ -337,9 +386,9 @@
             var emergency = airborne && (criticalUav || criticalUgv || !commsOk);
 
             var reason = '';
-            var path = [];
+            var path = groundPath;
             var holdUgv = false;
-            var ugvSpeedScale = 1;
+            var ugvSpeedScale = locomotion === 'LEG' ? 0.55 : 1;
             var ugvWaypoint = { x: human.x, y: human.y };
             var uavTarget = { x: ugv.x, y: ugv.y, alt: 0 };
             var docked = false;
@@ -386,45 +435,51 @@
                     uavTarget = { x: ugv.x, y: ugv.y, alt: cfg.hoverAlt };
                     reason = 'RTL emergencia: retorno al rover. ' + why + '.';
                 }
-                holdUgv = true;
-                ugvSpeedScale = 0.35;
-                path = findPath(world, ugv, findSafeGoal(world, human, cfg.tSafe, cfg), cfg);
+                holdUgv = false;
+                ugvSpeedScale = locomotion === 'LEG' ? 0.45 : 0.4;
+                path = groundPath;
                 ugvWaypoint = nextWaypoint(path, ugv, cfg.waypointSkip) || ugv;
             } else if (mode === MODES.FOLLOW_GROUND) {
                 docked = true;
                 uavTarget = { x: ugv.x, y: ugv.y, alt: 0 };
                 treeActive = 'ground';
-                if (Tfwd < cfg.tDeploy) {
+                holdUgv = dPersona <= cfg.followDist;
+                ugvWaypoint = nextWaypoint(groundPath, ugv, cfg.waypointSkip) || groundGoal;
+                var shouldDeploy = deployNeed > deployGate && uav.battery >= cfg.batUavMinDeploy;
+                if (shouldDeploy) {
                     groundFailed = true;
-                    if (uav.battery >= cfg.batUavMinDeploy) {
-                        mode = MODES.DEPLOY_UAV;
-                        reason = 'Despliego: T_fwd=' + fmt(Tfwd) + ' < ' + fmt(cfg.tDeploy) +
-                            ' y E_uav=' + fmt(uav.battery, 0) + '%.';
-                        treeActive = 'aerial';
-                        uavTarget = { x: ugv.x, y: ugv.y, alt: cfg.hoverAlt };
-                        holdUgv = true;
-                    } else {
-                        holdUgv = true;
-                        reason = 'No despliego: T_fwd=' + fmt(Tfwd) + ' < ' + fmt(cfg.tDeploy) +
-                            ' pero E_uav=' + fmt(uav.battery, 0) + '% < ' + cfg.batUavMinDeploy + '%. UGV en espera.';
-                    }
+                    mode = MODES.DEPLOY_UAV;
+                    docked = false;
+                    reason = 'Despliego: need=' + fmt(deployNeed) + ' > gate=' + fmt(deployGate) +
+                        ' (desvío ' + (hasGroundRoute ? fmt(detour, 1) + '×' : 'sin ruta') +
+                        ', contacto ' + fmt(contactRisk) + ', E_uav=' + fmt(uav.battery, 0) + '%).';
+                    treeActive = 'aerial';
+                    uavTarget = { x: ugv.x, y: ugv.y, alt: cfg.hoverAlt };
+                    holdUgv = false;
                 } else {
-                    ugvWaypoint = { x: human.x, y: human.y };
-                    holdUgv = dPersona <= cfg.followDist;
-                    reason = 'Tierra: T_fwd=' + fmt(Tfwd) + ' ≥ ' + fmt(cfg.tDeploy) +
-                        '. ' + (holdUgv ? 'Distancia de seguimiento alcanzada.' : 'Siguiendo objetivo.');
+                    var locoTxt = locomotion === 'LEG'
+                        ? 'Patas: freno de llantas, T=' + fmt(Tnow) + ' < ' + fmt(cfg.tWheel) + '.'
+                        : 'Ruedas: T=' + fmt(Tnow) + ' transitable.';
+                    var whyNot = uav.battery < cfg.batUavMinDeploy
+                        ? ' UAV con poca energía.'
+                        : (hasGroundRoute
+                            ? ' Ruta terrestre viable (desvío ' + fmt(detour, 1) + '×), need=' + fmt(deployNeed) + ' ≤ gate=' + fmt(deployGate) + '.'
+                            : ' Need=' + fmt(deployNeed) + ' aún bajo gate=' + fmt(deployGate) + '.');
+                    reason = locoTxt + whyNot + (holdUgv ? ' Distancia de seguimiento OK.' : ' Siguiendo objetivo.');
                 }
             } else if (mode === MODES.DEPLOY_UAV) {
                 treeActive = 'aerial';
                 groundFailed = true;
-                holdUgv = true;
+                holdUgv = false;
+                ugvWaypoint = nextWaypoint(groundPath, ugv, cfg.waypointSkip) || groundGoal;
                 uavTarget = { x: ugv.x, y: ugv.y, alt: cfg.hoverAlt };
                 if (!reason) {
-                    reason = 'Despegue: alt=' + fmt(uav.alt, 1) + ' / ' + fmt(cfg.hoverAlt, 0) + ' m.';
+                    reason = 'Despegue: alt=' + fmt(uav.alt, 1) + ' / ' + fmt(cfg.hoverAlt, 0) + ' m. UGV sigue por ' +
+                        (locomotion === 'LEG' ? 'patas' : 'ruedas') + '.';
                 }
                 if (uav.alt >= cfg.hoverAlt * 0.96) {
                     mode = MODES.AERIAL_FOLLOW;
-                    reason = 'UAV en techo. AERIAL_FOLLOW + replan A* del UGV.';
+                    reason = 'UAV en techo. Relé aéreo + UGV en ' + (locomotion === 'LEG' ? 'patas' : 'ruedas') + '.';
                 }
             }
 
@@ -432,19 +487,17 @@
                 treeActive = 'aerial';
                 groundFailed = true;
                 uavTarget = { x: human.x, y: human.y, alt: cfg.hoverAlt };
-                var goal = findSafeGoal(world, human, cfg.tSafe, cfg);
-                path = findPath(world, ugv, goal, cfg);
-                ugvWaypoint = nextWaypoint(path, ugv, cfg.waypointSkip) || goal;
-                ugvSpeedScale = 1;
-                holdUgv = false;
-                var los = Tugv > cfg.tSafe && Thuman > cfg.tSafe && lineTransitable(world, ugv, human, cfg.tDeploy, 14);
-                if (los) {
+                path = groundPath;
+                ugvWaypoint = nextWaypoint(path, ugv, cfg.waypointSkip) || groundGoal;
+                ugvSpeedScale = locomotion === 'LEG' ? 0.55 : 1;
+                holdUgv = dPersona <= cfg.followDist;
+                var canRejoin = Tugv > cfg.tSafe * 0.85 && Thuman > cfg.tLeg && losClear && detour < 1.8;
+                if (canRejoin) {
                     mode = MODES.RENDEZVOUS;
-                    reason = 'Rendezvous: T_ugv=' + fmt(Tugv) + ' y T_hum=' + fmt(Thuman) +
-                        ' > ' + fmt(cfg.tSafe) + ' y LOS terrestre libre.';
+                    reason = 'Rendezvous: reencuentro viable (LOS libre, T_ugv=' + fmt(Tugv) + ', desvío ' + fmt(detour, 1) + '×).';
                 } else if (!reason || prevMode === MODES.AERIAL_FOLLOW) {
-                    reason = 'Aéreo: UAV trackea humano. UGV replan T_fwd=' + fmt(Tfwd) +
-                        ' T_ugv=' + fmt(Tugv) + '.';
+                    reason = 'Aéreo: UAV cubre contacto. UGV ' + (locomotion === 'LEG' ? 'camina' : 'rueda') +
+                        ' T=' + fmt(Tugv) + ' need=' + fmt(deployNeed) + '.';
                 }
             }
 
@@ -452,10 +505,10 @@
                 treeActive = 'rendezvous';
                 groundFailed = true;
                 uavTarget = { x: ugv.x, y: ugv.y, alt: cfg.hoverAlt };
-                ugvSpeedScale = 0.5;
-                holdUgv = dPersona <= cfg.followDist || Tfwd < cfg.tDeploy;
-                if (!holdUgv) ugvWaypoint = { x: human.x, y: human.y };
-                path = findPath(world, ugv, findSafeGoal(world, human, cfg.tSafe, cfg), cfg);
+                ugvSpeedScale = locomotion === 'LEG' ? 0.45 : 0.5;
+                holdUgv = dPersona <= cfg.followDist;
+                if (!holdUgv) ugvWaypoint = nextWaypoint(groundPath, ugv, cfg.waypointSkip) || human;
+                path = groundPath;
                 if (dist(uav, ugv) < cfg.rendezvousDist) {
                     mode = MODES.LAND_DOCK;
                     reason = 'Marcador de plataforma en rango. Iniciando LAND_DOCK.';
@@ -468,8 +521,8 @@
                 treeActive = 'land';
                 groundFailed = true;
                 uavTarget = { x: ugv.x, y: ugv.y, alt: 0 };
-                ugvSpeedScale = 0.35;
-                holdUgv = Tfwd < cfg.tDeploy;
+                ugvSpeedScale = locomotion === 'LEG' ? 0.4 : 0.35;
+                holdUgv = dPersona <= cfg.followDist;
                 if (uav.alt <= cfg.landAlt && dist(uav, ugv) < cfg.rendezvousDist * 1.4) {
                     mode = MODES.FOLLOW_GROUND;
                     docked = true;
@@ -494,7 +547,11 @@
                 E_uav: uav.battery / 100,
                 R_riesgo: R,
                 C_comunicacion: C,
-                U_incertidumbre: U
+                U_incertidumbre: U,
+                deploy_need: deployNeed,
+                deploy_gate: deployGate,
+                locomotion: locomotion,
+                detour: hasGroundRoute ? detour : 99
             };
 
             return {
@@ -511,6 +568,7 @@
                     ugvSpeedScale: ugvSpeedScale,
                     holdUgv: holdUgv,
                     docked: docked,
+                    locomotion: locomotion,
                     reason: reason
                 }
             };
@@ -543,7 +601,7 @@
         findSafeGoal: findSafeGoal,
         sampleLookahead: sampleLookahead,
         nextWaypoint: nextWaypoint,
-        lineTransitable: lineTransitable,
+        lineClear: lineClear,
         MODES: MODES,
         STATUS: STATUS,
         DEFAULTS: DEFAULTS
