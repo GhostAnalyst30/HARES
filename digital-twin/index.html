@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HARES Digital Twin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Archivo+Black&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: rgba(10, 10, 10, 0.9);
+      --fg: #eaeaea;
+      --red: #e61919;
+      --green: #4af626;
+      --blue: #7ad4e8;
+      --amber: #d4a017;
+      --mono: 'IBM Plex Mono', monospace;
+      --heavy: 'Archivo Black', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--mono);
+      overflow: hidden;
+      height: 100dvh;
+    }
+    body::after {
+      content: " ";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.22) 50%);
+      z-index: 100;
+      background-size: 100% 4px;
+      pointer-events: none;
+      opacity: 0.3;
+    }
+    #viewport { position: absolute; inset: 0; background: #000; }
+    .hud {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      pointer-events: none;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+    }
+    .glass {
+      background: var(--panel);
+      border: 1px solid #2a2a2a;
+      pointer-events: auto;
+    }
+    .top {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      border-left: 4px solid var(--red);
+      padding: 10px 14px;
+    }
+    .brand h1 {
+      font-family: var(--heavy);
+      font-size: 17px;
+      letter-spacing: -0.03em;
+    }
+    .brand .sub { font-size: 10px; color: #888; margin-top: 4px; }
+    .phases {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding: 8px 10px;
+      flex-wrap: wrap;
+    }
+    .phase-chip {
+      font-size: 9px;
+      padding: 3px 7px;
+      border: 1px solid #333;
+      color: var(--green);
+    }
+    .right {
+      grid-column: 2;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+      max-height: calc(100dvh - 180px);
+    }
+    .panel { padding: 10px 12px; }
+    .panel h3 {
+      font-size: 11px;
+      color: var(--blue);
+      margin-bottom: 8px;
+      letter-spacing: 0.06em;
+    }
+    .tel-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      margin: 3px 0;
+    }
+    .tel-val { color: var(--fg); }
+    .tel-val.ok { color: var(--green); }
+    .tel-val.red { color: var(--red); }
+    .tel-val.amber { color: var(--amber); }
+    .tel-val.blue { color: var(--blue); }
+    .bb-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+      font-size: 10px;
+    }
+    .bt-list { display: flex; flex-direction: column; gap: 4px; }
+    .bt-node {
+      font-size: 10px;
+      padding: 4px 6px;
+      border: 1px solid #333;
+      color: #666;
+    }
+    .bt-node.running { border-color: var(--amber); color: var(--amber); }
+    .bt-node.success { border-color: var(--green); color: var(--green); }
+    .bt-node.failure { border-color: var(--red); color: var(--red); }
+    #decision-text { font-size: 10px; color: #aaa; line-height: 1.35; min-height: 2.6em; }
+    .bottom {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      align-items: center;
+    }
+    button, select {
+      font-family: var(--mono);
+      font-size: 10px;
+      background: #151515;
+      color: var(--fg);
+      border: 1px solid #333;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--blue); color: var(--blue); }
+    button.danger:hover { border-color: var(--red); color: var(--red); }
+    .console {
+      flex: 1;
+      min-width: 240px;
+      max-height: 120px;
+      overflow: auto;
+      padding: 8px;
+      font-size: 10px;
+    }
+    .log-entry { margin-bottom: 3px; color: #999; }
+    .log-entry.success { color: var(--green); }
+    .log-entry.warn { color: var(--amber); }
+    .log-entry.error { color: var(--red); }
+    .log-entry.info { color: var(--blue); }
+    .sensors {
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+    }
+    #minimap, #fpvCanvas {
+      width: 160px;
+      height: 90px;
+      background: #050505;
+      border: 1px solid #333;
+      image-rendering: pixelated;
+    }
+    .sensor-label {
+      font-size: 9px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: #050505;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    #loader h2 { font-family: var(--heavy); letter-spacing: -0.02em; }
+    .bar-wrap {
+      width: min(320px, 70vw);
+      height: 4px;
+      background: #222;
+    }
+    #loading-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--red);
+      transition: width 0.08s linear;
+    }
+    @media (max-width: 900px) {
+      .hud {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto 1fr auto;
+      }
+      .right {
+        grid-column: 1;
+        max-height: 28dvh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="viewport"></div>
+    <div class="hud">
+      <div class="top">
+        <div class="glass brand">
+          <h1>HARES DIGITAL TWIN</h1>
+          <div class="sub">Research Game · phases 0–4 · schema hares.dt.v1</div>
+        </div>
+        <div class="glass phases">
+          <span class="phase-chip">P0 BASE</span>
+          <span class="phase-chip">P1 VISUAL</span>
+          <span class="phase-chip">P2 PERCEPTION</span>
+          <span class="phase-chip">P3 ML</span>
+          <span class="phase-chip">P4 BRIDGE</span>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="glass panel">
+          <h3>TELEMETRÍA</h3>
+          <div class="tel-row"><span>Modo BT</span><span id="tel-mode" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Control</span><span id="tel-control" class="tel-val">HUMAN</span></div>
+          <div class="tel-row"><span>Escenario</span><span id="tel-scenario" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Dock</span><span id="tel-dock" class="tel-val">—</span></div>
+          <div class="tel-row"><span>T / Tfwd</span><span id="tel-trans" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Locomoción</span><span id="tel-loco" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Need / Gate</span><span id="tel-airscore" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Bat UGV</span><span id="tel-bat-ugv" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Bat UAV</span><span id="tel-bat-uav" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Comms</span><span id="tel-comms" class="tel-val">OK</span></div>
+          <div class="tel-row"><span>UAV listo</span><span id="tel-uavready" class="tel-val">—</span></div>
+          <div class="tel-row"><span>UGV acción</span><span id="tel-ugvact" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Desvío</span><span id="tel-detour" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Recon</span><span id="tel-recon" class="tel-val">0%</span></div>
+          <div class="tel-row"><span>Cámara</span><span id="tel-cam" class="tel-val">ORBIT</span></div>
+        </div>
+
+        <div class="glass panel">
+          <h3>VECTOR S_t</h3>
+          <div class="bb-grid">
+            <div>d <span id="bb-d">—</span></div>
+            <div>T <span id="bb-t">—</span></div>
+            <div>E <span id="bb-e">—</span></div>
+            <div>R <span id="bb-r">—</span></div>
+            <div>C <span id="bb-c">—</span></div>
+            <div>U <span id="bb-u">—</span></div>
+          </div>
+          <div style="margin-top:8px" id="decision-text">—</div>
+        </div>
+
+        <div class="glass panel">
+          <h3>BEHAVIOR TREE</h3>
+          <div class="bt-list">
+            <div id="bt-emergency" class="bt-node">EMERGENCY_RTL</div>
+            <div id="bt-assess" class="bt-node">ASSESS</div>
+            <div id="bt-ground" class="bt-node">FOLLOW_GROUND</div>
+            <div id="bt-wait" class="bt-node">WAIT_GROUND</div>
+            <div id="bt-aerial" class="bt-node">AERIAL_FOLLOW</div>
+            <div id="bt-rendezvous" class="bt-node">RENDEZVOUS</div>
+            <div id="bt-land" class="bt-node">LAND_DOCK</div>
+          </div>
+        </div>
+
+        <div class="glass panel">
+          <h3>ML / ESTUDIO</h3>
+          <div class="tel-row"><span>Acciones</span><span id="tel-ml" class="tel-val" style="font-size:9px;text-align:right;max-width:170px">—</span></div>
+          <div class="tel-row"><span>Conf decisión</span><span id="tel-ml-conf" class="tel-val">—</span></div>
+          <div class="tel-row"><span>Política</span><span id="tel-policy" class="tel-val" style="font-size:9px">—</span></div>
+          <div class="tel-row"><span>Train n</span><span id="tel-train" class="tel-val">0</span></div>
+          <div class="tel-row"><span>Recorder</span><span id="tel-rec" class="tel-val">—</span></div>
+          <div class="tel-row"><span>T_lost</span><span id="tel-tlost" class="tel-val">—</span></div>
+          <div class="tel-row"><span>D_max</span><span id="tel-dmax" class="tel-val">—</span></div>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="glass controls">
+          <select id="scenarioSelect" title="Escenario"></select>
+          <select id="controlSelect" title="Control">
+            <option value="HUMAN">1 · HUMAN</option>
+            <option value="UGV">2 · UGV</option>
+            <option value="UAV">3 · UAV</option>
+          </select>
+          <button id="btn-deploy">Forzar deploy</button>
+          <button id="btn-recall">Recall</button>
+          <button id="btn-cam">Cámara</button>
+          <button id="btn-overlay">Overlay T</button>
+          <button id="btn-quake" class="danger">Sismo manual</button>
+          <button id="btn-record">REC on/off</button>
+          <button id="btn-train">Entrenar ML</button>
+          <button id="btn-export">Export datos</button>
+          <button id="btn-reset" class="danger">Reset</button>
+        </div>
+        <div class="glass sensors">
+          <div>
+            <div class="sensor-label">MINIMAP RECON</div>
+            <canvas id="minimap" width="160" height="90"></canvas>
+          </div>
+          <div>
+            <div class="sensor-label">UAV FPV</div>
+            <canvas id="fpvCanvas" width="320" height="180"></canvas>
+          </div>
+        </div>
+        <div class="glass console" id="consoleLog"></div>
+      </div>
+    </div>
+
+    <div id="loader">
+      <h2>HARES DIGITAL TWIN</h2>
+      <div class="bar-wrap"><div id="loading-bar"></div></div>
+      <div style="font-size:11px;color:#666">Cargando fases 0–4…</div>
+    </div>
+  </div>
+
+  <script src="./vendor/hares-bt.js"></script>
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import { bootDigitalTwin } from './shared/app/main.js';
+    bootDigitalTwin(document.getElementById('app'));
+  </script>
+</body>
+</html>

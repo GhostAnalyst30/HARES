@@ -22,14 +22,23 @@ El problema central de la robótica de expedición es la transitabilidad. Los UG
 ---
 
 ## 🎮 Simuladores interactivos
+
+### Digital Twin (v3 — fases 0–4)
+Gemelo digital jugable en carpeta propia, **sin modificar** los sims legacy:
+
+*   **[HARES Digital Twin](./digital-twin/)** — control HUMAN/UGV/UAV, escenarios (terremoto, ruinas, pantano…), reconstrucción 3D desde el UAV, clasificador de acciones, export JSONL/CSV para estudios.
+
+Ver [digital-twin/README.md](./digital-twin/README.md). Abrir con `npx serve` → `/digital-twin/`.
+
+### Legacy (v1/v2)
 Los prototipos de navegador comparten el mismo cerebro (`hares-bt.js`): árbol a 10 Hz, locomoción **ruedas/patas**, umbral de despliegue **dinámico** (`need` vs `gate`) y replan A*.
 
 *   **[Simulador táctico 2D](./simulator.html)** — vista superior, morph llantas→patas, path A*.
 *   **[Simulador táctico 3D](./simulator3d.html)** — relieve (colinas, cresta, dunas), pendiente → \(T\), el mismo árbol.
 
-**Controles:** `WASD` / flechas. En arena o pendiente el rover **frena las llantas y camina**. El dron no despega por un $T$ fijo: solo si `need > gate`. Forzar despegue/rendezvous sigue disponible; $E_{UAV}<20\%$ o $E_{UGV}<15\%$ dispara RTL.
+**Controles (legacy):** `WASD` / flechas. En arena o pendiente el rover **frena las llantas y camina**. El dron no despega por un $T$ fijo: solo si `need > gate`. Forzar despegue/rendezvous sigue disponible; $E_{UAV}<20\%$ o $E_{UGV}<15\%$ dispara RTL.
 
-Si el navegador bloquea scripts locales, sirve la carpeta (`npx serve`) y abre `/simulator.html`.
+Si el navegador bloquea scripts locales, sirve la carpeta (`npx serve`) y abre `/simulator.html` o `/digital-twin/`.
 
 ---
 
@@ -65,8 +74,9 @@ Para una guía detallada de construcción, consulta la [Guía de Implementación
 ## 📂 Estructura del Repositorio
 *   `HARES.md`: Documentación académica completa, estado del arte y formulación de hipótesis.
 *   `hares-bt.js`: Cerebro compartido (Behavior Tree + A* + vector \(S_t\)).
-*   `simulator.html`: Simulador interactivo 2D (HTML5/Canvas).
-*   `simulator3d.html`: Simulador interactivo 3D (Three.js).
+*   `simulator.html`: Simulador interactivo 2D (HTML5/Canvas) — legacy.
+*   `simulator3d.html`: Simulador interactivo 3D (Three.js) — legacy.
+*   `digital-twin/`: Gemelo digital jugable (fases 0–4), separado del legacy.
 *   `HARES_V2_PHYSICAL_GUIDE.md`: Manual de hardware y arquitectura de software ROS 2.
 *   `hares_ws/`: (En desarrollo) Espacio de trabajo de ROS 2 para la implementación física.
 

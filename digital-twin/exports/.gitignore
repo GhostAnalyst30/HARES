@@ -1,0 +1,5 @@
+# Datasets exportados localmente (mantener carpeta)
+*.jsonl
+*.csv
+*_rosbag_preview.json
+!/.gitkeep
